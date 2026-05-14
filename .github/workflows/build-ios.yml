@@ -81,19 +81,20 @@ jobs:
 
           TARGET_PATH="${{ steps.project.outputs.path }}"
           SCHEME="${{ steps.scheme.outputs.name }}"
+          DESTINATION='generic/platform=iOS Simulator'
 
           if [ "${{ steps.project.outputs.type }}" = "workspace" ]; then
             xcodebuild \
               -workspace "$TARGET_PATH" \
               -scheme "$SCHEME" \
               -sdk iphonesimulator \
-              -destination 'platform=iOS Simulator,name=iPhone 15' \
+              -destination "$DESTINATION" \
               clean build
           else
             xcodebuild \
               -project "$TARGET_PATH" \
               -scheme "$SCHEME" \
               -sdk iphonesimulator \
-              -destination 'platform=iOS Simulator,name=iPhone 15' \
+              -destination "$DESTINATION" \
               clean build
           fi
