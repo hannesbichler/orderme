@@ -25,6 +25,10 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Set iOS minimum deployment target
+        run: |
+          sed -i '' "s/platform :ios, '.*'/platform :ios, '13.0'/" ios/Podfile || true
+
       - name: Install CocoaPods
         run: |
           cd ios
