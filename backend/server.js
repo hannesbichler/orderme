@@ -21,7 +21,7 @@ app.use(express.json());
 const DB_CONFIG = {
   user: process.env.DB_USER || 'w4cash',
   password: process.env.DB_PASSWORD || 'w4cash',
-  connectString: process.env.DB_CONNECT_STRING || '172.17.0.36:1521/xe',
+  connectString: process.env.DB_CONNECT_STRING || 'localhost:1521/xe',
 };
 
 // Use thin mode – no Oracle Client libraries required
@@ -217,11 +217,11 @@ app.get('/floors', async (_req, res) => {
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
 /**
- * GET /orders?placeId=<id>
- * Returns open orders for a place (table), each with embedded line items.
+ * GET /ticketinfo?placeId=<id>
+ * Returns open ticketinfos for a place (table), each with embedded line items.
  * { id, placeId, status, note, items: [{id, orderId, productId, productName, price, qty}] }
  */
-app.get('/orders', async (req, res) => {
+app.get('/ticketinfo', async (req, res) => {
   let connection;
   try {
     connection = await oracledb.getConnection(DB_CONFIG);
@@ -229,26 +229,26 @@ app.get('/orders', async (req, res) => {
     const placeId = req.query.placeId;
     let sql, binds;
     if (placeId !== undefined) {
-      sql   = `SELECT id, place_id, status, note FROM orders WHERE place_id = :placeId ORDER BY id`;
+      sql   = `SELECT id, place_id, status, note FROM ticketinfo WHERE place_id = :placeId ORDER BY id`;
       binds = [placeId];
     } else {
-      sql   = `SELECT id, place_id, status, note FROM orders ORDER BY id`;
+      sql   = `SELECT id, place_id, status, note FROM ticketinfo ORDER BY id`;
       binds = [];
     }
 
     const result = await connection.execute(sql, binds,
       { outFormat: oracledb.OUT_FORMAT_OBJECT });
 
-    // For each order, fetch its line items
-    const orders = await Promise.all(result.rows.map(async (row) => {
-      const orderId = String(row.ID);
+    // For each ticketinfo, fetch its line items
+    const ticketinfos = await Promise.all(result.rows.map(async (row) => {
+      const ticketinfoId = String(row.ID);
       const linesResult = await connection.execute(
         `SELECT ol.id, ol.order_id, ol.product_id, p.name AS product_name, ol.price, ol.qty
            FROM order_lines ol
            JOIN products p ON p.id = ol.product_id
           WHERE ol.order_id = :orderId
           ORDER BY ol.id`,
-        [orderId],
+        [ticketinfoId],
         { outFormat: oracledb.OUT_FORMAT_OBJECT }
       );
       const items = linesResult.rows.map((lr) => ({
@@ -260,7 +260,7 @@ app.get('/orders', async (req, res) => {
         qty:         Number(lr.QTY ?? 1),
       }));
       return {
-        id:      orderId,
+        id:      ticketinfoId,
         placeId: String(row.PLACE_ID ?? ''),
         status:  row.STATUS ?? '',
         note:    row.NOTE   ?? '',
@@ -331,8 +331,8 @@ app.get('/order-lines', async (req, res) => {
 
 /**
  * GET /categories
- * Returns all product categories.
- * { id, name }
+ * Returns all product categories in HAL format.
+ * { _embedded: { categoryList: [{ id_, name, parent }] } }
  */
 app.get('/categories', async (_req, res) => {
   let connection;
@@ -340,20 +340,158 @@ app.get('/categories', async (_req, res) => {
     connection = await oracledb.getConnection(DB_CONFIG);
 
     const result = await connection.execute(
-      `SELECT id, name FROM categories ORDER BY id`,
+      `SELECT ID, NAME, PARENT FROM CATEGORIES ORDER BY ID`,
       [],
       { outFormat: oracledb.OUT_FORMAT_OBJECT }
     );
 
-    const categories = result.rows.map((row) => ({
-      id:   String(row.ID),
-      name: row.NAME ?? '',
+    const categoryList = result.rows.map((row) => ({
+      id_:    String(row.ID),
+      name:   row.NAME ?? '',
+      parent: row.PARENT != null ? String(row.PARENT) : null,
     }));
 
-    res.json({ categories });
+    res.json({ _embedded: { categoryList } });
   } catch (err) {
     console.error('Database error:', err.message);
     res.status(500).json({ error: 'Failed to fetch categories', detail: err.message });
+  } finally {
+    if (connection) {
+      try { await connection.close(); } catch (_) {}
+    }
+  }
+});
+
+/**
+ * GET /products
+ * Returns all products in HAL format (used by Flutter client).
+ * { _embedded: { productList: [{ id_, name, pricesell, categoryId }] } }
+ */
+app.get('/products', async (_req, res) => {
+  let connection;
+  try {
+    connection = await oracledb.getConnection(DB_CONFIG);
+
+    const result = await connection.execute(
+      `SELECT ID, NAME, PRICESELL, CATEGORY, ATTRIBUTESET_ID
+         FROM PRODUCTS
+        ORDER BY ID`,
+      [],
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+
+    const productList = result.rows.map((row) => ({
+      id_:        String(row.ID),
+      name:       row.NAME ?? '',
+      pricesell:  Number(row.PRICESELL ?? 0),
+      categoryId: String(row.CATEGORY ?? ''),
+      attributeSetId: row.ATTRIBUTESET_ID != null ? String(row.ATTRIBUTESET_ID) : null,
+    }));
+
+    res.json({ _embedded: { productList } });
+  } catch (err) {
+    console.error('Database error:', err.message);
+    res.status(500).json({ error: 'Failed to fetch products', detail: err.message });
+  } finally {
+    if (connection) {
+      try { await connection.close(); } catch (_) {}
+    }
+  }
+});
+
+/**
+ * GET /products/:categoryId
+ * Returns products for a category in HAL format (used by Flutter client).
+ * { _embedded: { productList: [{ id_, name, pricesell, categoryId }] } }
+ */
+app.get('/products/:categoryId', async (req, res) => {
+  const { categoryId } = req.params;
+  let connection;
+  try {
+    connection = await oracledb.getConnection(DB_CONFIG);
+
+    const result = await connection.execute(
+      `SELECT ID, NAME, PRICESELL, CATEGORY, ATTRIBUTESET_ID
+         FROM PRODUCTS
+        WHERE CATEGORY = :catId
+        ORDER BY ID`,
+      [categoryId],
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+
+    const productList = result.rows.map((row) => ({
+      id_:        String(row.ID),
+      name:       row.NAME ?? '',
+      pricesell:  Number(row.PRICESELL ?? 0),
+      categoryId: String(row.CATEGORY ?? ''),
+      attributeSetId: row.ATTRIBUTESET_ID != null ? String(row.ATTRIBUTESET_ID) : null,
+    }));
+
+    res.json({ _embedded: { productList } });
+  } catch (err) {
+    console.error('Database error:', err.message);
+    res.status(500).json({ error: 'Failed to fetch products', detail: err.message });
+  } finally {
+    if (connection) {
+      try { await connection.close(); } catch (_) {}
+    }
+  }
+});
+
+/**
+ * GET /attributes?attributeSetId=<id>
+ * Returns attribute names and possible values for a product attribute set.
+ * {
+ *   attributes: ["Size", "Sauce"],
+ *   additionalAttributes: ["Small", "Medium", "Hot", "Mild"]
+ * }
+ */
+app.get('/attributes', async (req, res) => {
+  const attributeSetId = req.query.attributeSetId || req.query.setId;
+  if (!attributeSetId) {
+    return res.status(400).json({ error: 'attributeSetId (or setId) is required' });
+  }
+
+  let connection;
+  try {
+    connection = await oracledb.getConnection(DB_CONFIG);
+
+    const attrResult = await connection.execute(
+      `SELECT a.name
+         FROM attributeuse au
+         JOIN attribute a ON a.id = au.attribute_id
+        WHERE au.attributeset_id = :setId
+        ORDER BY au.lineno, a.name`,
+      [String(attributeSetId)],
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+
+    const valueResult = await connection.execute(
+      `SELECT av.value
+         FROM attributeuse au
+         JOIN attributevalue av ON av.attribute_id = au.attribute_id
+        WHERE au.attributeset_id = :setId
+        ORDER BY av.lineno, av.value`,
+      [String(attributeSetId)],
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+
+    const attributes = [...new Set(
+      attrResult.rows
+        .map((row) => (row.NAME ?? '').trim())
+        .filter((name) => name.length > 0)
+    )];
+
+    const additionalAttributes = [...new Set(
+      valueResult.rows
+        .map((row) => (row.VALUE ?? '').trim())
+        .filter((value) => value.length > 0)
+    )];
+
+    res.json({ attributes, additionalAttributes });
+  } catch (err) {
+    console.error('Database error:', err.message);
+    res.status(500).json({ error: 'Failed to fetch attributes', detail: err.message });
   } finally {
     if (connection) {
       try { await connection.close(); } catch (_) {}
@@ -402,6 +540,62 @@ app.get('/products', async (req, res) => {
   }
 });
 
+
+
+/**
+ * POST /order-lines
+ * Adds a product to an order. If the product is already in the order, increments qty.
+ * Body: { "orderId": "1", "productId": "2", "price": 2.50, "qty": 1 }
+ */
+app.post('/order-lines', async (req, res) => {
+  const { orderId, productId, price, qty = 1 } = req.body;
+  if (!orderId || !productId) {
+    return res.status(400).json({ error: '"orderId" and "productId" are required' });
+  }
+  let connection;
+  try {
+    connection = await oracledb.getConnection(DB_CONFIG);
+
+    const existing = await connection.execute(
+      `SELECT id FROM order_lines WHERE order_id = :orderId AND product_id = :productId`,
+      [String(orderId), String(productId)],
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+
+    if (existing.rows.length > 0) {
+      const lineId = String(existing.rows[0].ID);
+      await connection.execute(
+        `UPDATE order_lines SET qty = qty + :qty WHERE id = :id`,
+        [Number(qty), lineId]
+      );
+      await connection.commit();
+      res.json({ success: true, action: 'updated', id: lineId });
+    } else {
+      const result = await connection.execute(
+        `INSERT INTO order_lines (order_id, product_id, price, qty)
+         VALUES (:orderId, :productId, :price, :qty)
+         RETURNING id INTO :newId`,
+        {
+          orderId:   String(orderId),
+          productId: String(productId),
+          price:     Number(price ?? 0),
+          qty:       Number(qty),
+          newId:     { dir: oracledb.BIND_OUT, type: oracledb.NUMBER },
+        }
+      );
+      await connection.commit();
+      const newId = String(result.outBinds.newId[0]);
+      res.json({ success: true, action: 'inserted', id: newId });
+    }
+  } catch (err) {
+    console.error('Database error:', err.message);
+    res.status(500).json({ error: 'Failed to add order line', detail: err.message });
+  } finally {
+    if (connection) {
+      try { await connection.close(); } catch (_) {}
+    }
+  }
+});
 
 
 // ── Printers ──────────────────────────────────────────────────────────────────

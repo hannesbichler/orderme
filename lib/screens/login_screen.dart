@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
+import '../utils/string_utils.dart';
 import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -11,18 +12,8 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  
-  final _formKey = GlobalKey<FormState>();
-  final _usernameCtrl = TextEditingController();
-  final _passwordCtrl = TextEditingController();
-
   final AuthService _authService = AuthService();
 
-  bool _loading = false;
-  bool _obscurePassword = true;
-  String? _errorMessage;
-
-  // Hint users loaded from the web service
   List<User> _users = [];
   bool _loadingUsers = true;
   String? _userFetchError;
@@ -48,43 +39,87 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() {
-      _loading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final user = await _authService.login(
-        _usernameCtrl.text.trim(),
-        _passwordCtrl.text.trim(),
-      );
-
-      if (!mounted) return;
-
-      if (user != null) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => HomeScreen(user: user),
-          ),
-        );
-      } else {
-        setState(() => _errorMessage = 'Invalid username or password.');
-      }
-    } catch (e) {
-      setState(() => _errorMessage = 'Error: $e');
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
+  void _loginAs(User user) {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => HomeScreen(user: user),
+      ),
+    );
   }
 
-  @override
-  void dispose() {
-    _usernameCtrl.dispose();
-    _passwordCtrl.dispose();
-    super.dispose();
+  Future<void> _handleUserTap(User user) async {
+    if (user.password.trim().isEmpty) {
+      _loginAs(user);
+      return;
+    }
+
+    final enteredPassword = await _showPasswordDialog(user);
+    if (!mounted || enteredPassword == null) return;
+    String passwd = sha1FromString(enteredPassword);
+    if (passwd == user.password) {
+      _loginAs(user);
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Invalid password.')),
+    );
+  }
+
+  Future<String?> _showPasswordDialog(User user) async {
+    final controller = TextEditingController();
+    var obscureText = true;
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              title: Text('Login as ${user.name}'),
+              content: TextField(
+                controller: controller,
+                autofocus: true,
+                obscureText: obscureText,
+                onSubmitted: (value) {
+                  Navigator.of(dialogContext).pop(value.trim());
+                },
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    onPressed: () {
+                      setDialogState(() {
+                        obscureText = !obscureText;
+                      });
+                    },
+                    icon: Icon(
+                      obscureText ? Icons.visibility_off : Icons.visibility,
+                    ),
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop(controller.text.trim());
+                  },
+                  child: const Text('Login'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    controller.dispose();
+    return result;
   }
 
   @override
@@ -112,182 +147,113 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 4),
               const Text(
-                'Sign in to continue',
+                'Choose a user to continue',
                 style: TextStyle(color: Colors.grey),
               ),
               const SizedBox(height: 32),
 
-              // Login card
+              // User selection card
               Card(
                 elevation: 4,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16)),
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 child: Padding(
                   padding: const EdgeInsets.all(24),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
+                  child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Username
-                        TextFormField(
-                          controller: _usernameCtrl,
-                          textInputAction: TextInputAction.next,
-                          decoration: const InputDecoration(
-                            labelText: 'Username',
-                            prefixIcon: Icon(Icons.person_outline),
-                            border: OutlineInputBorder(),
+                        const Text(
+                          'Users',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1A237E),
                           ),
-                          validator: (v) =>
-                              (v == null || v.trim().isEmpty)
-                                  ? 'Please enter your username'
-                                  : null,
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Tap a user to open the app. Users with a password will be prompted.',
+                          style: TextStyle(color: Colors.grey),
                         ),
                         const SizedBox(height: 16),
-
-                        // Password (= email for demo users)
-                        TextFormField(
-                          controller: _passwordCtrl,
-                          obscureText: _obscurePassword,
-                          textInputAction: TextInputAction.done,
-                          onFieldSubmitted: (_) => _submit(),
-                          decoration: InputDecoration(
-                            labelText: 'Password (email)',
-                            prefixIcon:
-                                const Icon(Icons.lock_outline),
-                            border: const OutlineInputBorder(),
-                            suffixIcon: IconButton(
-                              icon: Icon(_obscurePassword
-                                  ? Icons.visibility_off
-                                  : Icons.visibility),
-                              onPressed: () => setState(
-                                  () => _obscurePassword =
-                                      !_obscurePassword),
-                            ),
-                          ),
-                          validator: (v) =>
-                              (v == null || v.trim().isEmpty)
-                                  ? 'Please enter your password'
-                                  : null,
-                        ),
-                        const SizedBox(height: 8),
-
-                        if (_errorMessage != null)
-                          Padding(
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 8),
-                            child: Text(
-                              _errorMessage!,
-                              style: const TextStyle(color: Colors.red),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-
-                        const SizedBox(height: 8),
-
-                        // Login button
-                        SizedBox(
-                          height: 48,
-                          child: ElevatedButton(
-                            onPressed: _loading ? null : _submit,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor:
-                                  const Color(0xFF3A6FFF),
-                              shape: RoundedRectangleBorder(
-                                borderRadius:
-                                    BorderRadius.circular(8)),
-                            ),
-                            child: _loading
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2,
+                        if (_loadingUsers)
+                          const Center(child: CircularProgressIndicator())
+                        else if (_userFetchError != null)
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                _userFetchError!,
+                                style: const TextStyle(color: Colors.red),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                height: 48,
+                                child: ElevatedButton(
+                                  onPressed: _loadUsers,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF3A6FFF),
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
                                     ),
-                                  )
-                                : const Text(
-                                    'Login',
-                                    style: TextStyle(
-                                        fontSize: 16,
-                                        color: Colors.white),
                                   ),
+                                  child: const Text('Retry'),
+                                ),
+                              ),
+                            ],
+                          )
+                        else if (_users.isEmpty)
+                          const Text(
+                            'No users available.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.grey),
+                          )
+                        else
+                          ..._users.map(
+                            (user) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: SizedBox(
+                                height: 52,
+                                child: ElevatedButton.icon(
+                                  onPressed: () => _handleUserTap(user),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.white,
+                                    foregroundColor: const Color(0xFF1A237E),
+                                    elevation: 1,
+                                    alignment: Alignment.centerLeft,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      side: const BorderSide(
+                                        color: Color(0xFFBBCCFF),
+                                      ),
+                                    ),
+                                  ),
+                                  icon: const Icon(
+                                    Icons.person_outline,
+                                    color: Color(0xFF3A6FFF),
+                                  ),
+                                  label: Text(
+                                    user.name,
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
                 ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Available users hint panel
-              Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Available accounts (from web service)',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13),
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Username  /  Password (email)',
-                        style: TextStyle(
-                            fontSize: 11, color: Colors.grey),
-                      ),
-                      const Divider(),
-                      if (_loadingUsers)
-                        const Center(child: CircularProgressIndicator())
-                      else if (_userFetchError != null)
-                        Text(_userFetchError!,
-                            style: const TextStyle(color: Colors.red))
-                      else
-                        ..._users.map(
-                          (u) => InkWell(
-                            onTap: () {
-                              _usernameCtrl.text = u.name;
-                              _passwordCtrl.text = "";//u.email;
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 4),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.person,
-                                      size: 14,
-                                      color: Color(0xFF3A6FFF)),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: Text(
-                                      '${u.name}  ·  "",//{u.email}',
-                                      style: const TextStyle(
-                                          fontSize: 12),
-                                      overflow:
-                                          TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
     );
   }
 }

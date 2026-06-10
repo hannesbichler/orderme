@@ -19,7 +19,7 @@ class AuthService {
           'Failed to load users (HTTP ${response.statusCode})');
     }
 
-    final List<dynamic> data = json.decode(response.body)['persons'] as List<dynamic>;
+    final List<dynamic> data = json.decode(response.body)['_embedded']['personList'] as List<dynamic>;
     _cachedUsers = data
         .map((e) => User.fromJson(e as Map<String, dynamic>))
         .toList();

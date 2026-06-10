@@ -7,9 +7,10 @@ class Place {
 
   factory Place.fromJson(Map<String, dynamic> json) {
     return Place(
-      id:      json['id'] as String? ?? '',
+      id:      json['id_'] as String? ?? '',
       name:    json['name'] as String? ?? '',
-      floor: json['floor'] as String? ?? '',
+      floor: ''
+//      floor: json['floor'] as String? ?? '',
     );
   }
 }

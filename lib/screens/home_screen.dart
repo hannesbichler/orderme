@@ -78,11 +78,17 @@ class _RestaurantTabState extends State<_RestaurantTab>
         setState(() => _error = 'HTTP ${response.statusCode}');
         return;
       }
-      final body = json.decode(response.body);
-      final List<dynamic> raw =
-          (body is Map && body.containsKey('floors')) ? body['floors'] : body;
-      final floors =
-          raw.map((e) => Floor.fromJson(e as Map<String, dynamic>)).toList();
+      //final body = json.decode(response.body);
+
+final List<dynamic> data = json.decode(response.body)['_embedded']['floorList'] as List<dynamic>;
+    final floors = data
+        .map((e) => Floor.fromJson(e as Map<String, dynamic>))
+        .toList();
+
+    //  final List<dynamic> raw =
+    //      (body is Map && body.containsKey('floorList')) ? body['_embedded']['floorList'] : body;
+    //  final floors =
+    //      raw.map((e) => Floor.fromJson(e as Map<String, dynamic>)).toList();
       setState(() {
         _floors = floors;
         _floorTabController?.dispose();
@@ -181,13 +187,13 @@ class _FloorContentState extends State<_FloorContent> {
         setState(() => _error = 'HTTP ${response.statusCode}');
         return;
       }
-      final body = json.decode(response.body);
-      final List<dynamic> raw =
-          (body is Map && body.containsKey('places')) ? body['places'] : body;
-      setState(() {
-        _places =
-            raw.map((e) => Place.fromJson(e as Map<String, dynamic>)).toList();
-      });
+
+      final List<dynamic> data = json.decode(response.body)['_embedded']['placeList'] as List<dynamic>;
+    final places = data
+        .map((e) => Place.fromJson(e as Map<String, dynamic>))
+        .toList();
+      setState(() => _places = places);
+      
     } catch (e) {
       setState(() => _error = e.toString());
     }

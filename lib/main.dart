@@ -1,7 +1,16 @@
 import 'package:flutter/material.dart';
+import 'services/product_catalog_service.dart';
 import 'screens/login_screen.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await ProductCatalogService.instance.preloadProducts();
+    await ProductCatalogService.instance.preloadCategories();
+  } catch (_) {
+    // Product cache can be loaded lazily by screens if startup preload fails.
+  }
+
   runApp(const OrderMeApp());
 }
 
