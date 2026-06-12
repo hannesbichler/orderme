@@ -27,7 +27,7 @@ jobs:
 
       - name: Set iOS minimum deployment target
         run: |
-          sed -i '' "s/platform :ios, '.*'/platform :ios, '26.5.0'/" ios/Podfile || true
+          sed -i '' "s/platform :ios, '.*'/platform :ios, '26.0'/" ios/Podfile || true
 
       - name: Install CocoaPods
         run: |
@@ -38,12 +38,12 @@ jobs:
       - name: Build iOS (no codesign)
         run: flutter build ipa --release --no-codesign
 
-      - name: Package .app into .ipa
-        run: |
-          mkdir -p Payload
-          cp -r "build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app" Payload/
-          zip -r Runner.ipa Payload
-          echo "IPA created: $(du -sh Runner.ipa | cut -f1)"
+#      - name: Package .app into .ipa
+#        run: |
+#          mkdir -p Payload
+#          cp -r "build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app" Payload/
+#          zip -r Runner.ipa Payload
+#          echo "IPA created: $(du -sh Runner.ipa | cut -f1)"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
