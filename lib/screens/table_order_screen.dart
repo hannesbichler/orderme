@@ -21,11 +21,12 @@ class TableOrderScreen extends StatefulWidget {
 }
 
 class _TableOrderScreenState extends State<TableOrderScreen> {
-  static const _base = 'http://172.17.0.36:3000';
+  static const _base = 'http://217.154.223.125:3000';
   static const double _productButtonHeight = 80;
   static const double _panelDividerHeight = 8;
   static const double _leftMinPaneHeight = 140;
   static const double _numpadMinHeight = 170;
+  static const double _numpadCollapsedHeight = 56;
   static const double _productsMinHeight = 120;
   final buttonsEnabledInLine = false; // set to false to hide + and - buttons in order lines
   // OrderItem (top-left)
@@ -49,6 +50,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
 
   // Numpad input
   String _numInput = '';
+  bool _isNumpadCollapsed = false;
 
   // Selected order line
   int? _selectedLineIdx;
@@ -455,6 +457,10 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
       backgroundColor: const Color(0xFFF0F4FF),
       body: LayoutBuilder(
         builder: (context, constraints) {
+          if (constraints.maxWidth <= 700) {
+            return _buildPhoneLayout();
+          }
+
           final maxLeft = constraints.maxWidth - 180;
           return Row(
             children: [
@@ -556,6 +562,102 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
           );
         },
       ),
+    );
+  }
+
+  Widget _buildPhoneLayout() {
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        children: [
+          Container(
+            color: Colors.white,
+            child: const TabBar(
+              labelColor: Color(0xFF1A237E),
+              indicatorColor: Color(0xFF3A6FFF),
+              tabs: [
+                Tab(/*icon: Icon(Icons.receipt_long),*/ text: 'Buchungen'),
+                Tab(/*icon: Icon(Icons.fastfood_outlined),*/ text: 'Produkte'),
+              ],
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              children: [
+                _SectionCard(
+                  title: 'Buchungen',
+                  icon: Icons.receipt_long,
+                  child: _buildOrdersList(),
+                ),
+                Column(
+                  children: [
+                    SizedBox(height: 56, child: _buildMobileCategoryStrip()),
+                    Expanded(
+                      child: _SectionCard(
+                        title: _selectedCategory != null
+                            ? 'Produkte – ${_selectedCategory!.name}'
+                            : 'Produkte',
+                        icon: Icons.fastfood_outlined,
+                        child: _buildProductsGrid(),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileCategoryStrip() {
+    if (_categoriesError != null) {
+      return Center(
+        child: Text(
+          'Kategorien konnten nicht geladen werden',
+          style: TextStyle(color: Colors.red.shade400, fontSize: 12),
+        ),
+      );
+    }
+    if (_categories == null) {
+      return const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)));
+    }
+    if (_categories!.isEmpty) {
+      return const Center(
+        child: Text(
+          'Keine Kategorien',
+          style: TextStyle(color: Colors.grey),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      itemCount: _categories!.length,
+      separatorBuilder: (_, __) => const SizedBox(width: 6),
+      itemBuilder: (context, i) {
+        final category = _categories![i];
+        final selected = _selectedCategory?.id == category.id;
+        return ChoiceChip(
+          label: Text(category.name),
+          selected: selected,
+          onSelected: (_) {
+            setState(() => _selectedCategory = category);
+            _applyProductFilter();
+          },
+          labelStyle: TextStyle(
+            color: selected ? Colors.white : const Color(0xFF1A237E),
+            fontWeight: FontWeight.w600,
+            fontSize: 12,
+          ),
+          selectedColor: const Color(0xFF3A6FFF),
+          backgroundColor: Colors.white,
+          side: const BorderSide(color: Color(0xFFBBCCFF)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        );
+      },
     );
   }
 
@@ -820,7 +922,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
 
   // ── Numpad ───────────────────────────────────────────────────────────────
 
-  Widget _buildNumpad() {
+  Widget _buildNumpad({required bool isCollapsed}) {
     final display = _numInput.isEmpty ? '1' : _numInput;
 
     bool canEditSelectedLineAttributes() {
@@ -853,7 +955,9 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
     //  ['-', 'd', '+'],
     ];
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+      padding: isCollapsed
+          ? const EdgeInsets.fromLTRB(10, 4, 10, 4)
+          : const EdgeInsets.fromLTRB(10, 6, 10, 6),
       decoration: const BoxDecoration(
         color: Color(0xFFEEF2FF),
         border: Border(bottom: BorderSide(color: Color(0xFFBBCCFF))),
@@ -861,6 +965,42 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          Row(
+            children: [
+              const Icon(Icons.dialpad, size: 16, color: Color(0xFF3A6FFF)),
+              const SizedBox(width: 6),
+              const Expanded(
+                child: Text(
+                  'Numpad',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1A237E),
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: isCollapsed ? 'Numpad expand' : 'Numpad collapse',
+                onPressed: () {
+                  setState(() {
+                    _isNumpadCollapsed = !_isNumpadCollapsed;
+                  });
+                },
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints.tightFor(
+                  width: 36,
+                  height: 36,
+                ),
+                icon: Icon(
+                  isCollapsed
+                      ? Icons.keyboard_arrow_down
+                      : Icons.keyboard_arrow_up,
+                  color: const Color(0xFF1A237E),
+                ),
+              ),
+            ],
+          ),
+          if (!isCollapsed) ...[
           // Display
           Container(
             width:  double.infinity,
@@ -990,6 +1130,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
                   }).toList(),
                 ),
               )),
+          ],
         ],
       ),
     );
@@ -1008,42 +1149,89 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
     }
     return LayoutBuilder(
       builder: (context, constraints) {
+        final isCompact = constraints.maxWidth <= 700;
+
+        if (isCompact) {
+          final compactNumpadHeight = _isNumpadCollapsed
+              ? _numpadCollapsedHeight
+              : (constraints.maxHeight * 1).clamp(190.0, 484.0);
+
+          return Column(
+            children: [
+              SizedBox(
+                height: compactNumpadHeight,
+                child: _buildNumpad(isCollapsed: _isNumpadCollapsed),
+              ),
+              SizedBox(height: _isNumpadCollapsed ? 0 : 6),
+              Expanded(
+                child: _products!.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'Keine Produkte in dieser Kategorie.',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      )
+                    : GridView.builder(
+                        padding: const EdgeInsets.all(10),
+                        gridDelegate:
+                            const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 140,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 8,
+                          mainAxisExtent: 72,
+                        ),
+                        itemCount: _products!.length,
+                        itemBuilder: (context, i) {
+                          final p = _products![i];
+                          return _ProductCard(
+                            product: p,
+                            onTap: () => _openAttributesAndAddProduct(p),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          );
+        }
+
         final maxNumpad =
             constraints.maxHeight - _panelDividerHeight - _productsMinHeight;
         final numpadHeight =
             _numpadPaneHeight.clamp(_numpadMinHeight, maxNumpad);
-        final productsHeight =
-            constraints.maxHeight - _panelDividerHeight - numpadHeight;
+        final productsHeight = _isNumpadCollapsed
+          ? constraints.maxHeight - _numpadCollapsedHeight
+            : constraints.maxHeight - _panelDividerHeight - numpadHeight;
 
         return Column(
           children: [
             SizedBox(
-              height: numpadHeight,
-              child: _buildNumpad(),
+              height: _isNumpadCollapsed ? _numpadCollapsedHeight : numpadHeight,
+              child: _buildNumpad(isCollapsed: _isNumpadCollapsed),
             ),
-            GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onVerticalDragUpdate: (d) {
-                setState(() {
-                  _numpadPaneHeight = (_numpadPaneHeight + d.delta.dy)
-                      .clamp(_numpadMinHeight, maxNumpad);
-                });
-              },
-              child: MouseRegion(
-                cursor: SystemMouseCursors.resizeRow,
-                child: Container(
-                  height: _panelDividerHeight,
-                  color: Colors.transparent,
-                  child: Center(
-                    child: Container(
-                      height: 2,
-                      margin: const EdgeInsets.symmetric(horizontal: 24),
-                      color: const Color(0xFFBBCCFF),
+            if (!_isNumpadCollapsed)
+              GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onVerticalDragUpdate: (d) {
+                  setState(() {
+                    _numpadPaneHeight = (_numpadPaneHeight + d.delta.dy)
+                        .clamp(_numpadMinHeight, maxNumpad);
+                  });
+                },
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.resizeRow,
+                  child: Container(
+                    height: _panelDividerHeight,
+                    color: Colors.transparent,
+                    child: Center(
+                      child: Container(
+                        height: 2,
+                        margin: const EdgeInsets.symmetric(horizontal: 24),
+                        color: const Color(0xFFBBCCFF),
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
             SizedBox(
               height: productsHeight,
               child: _products!.isEmpty

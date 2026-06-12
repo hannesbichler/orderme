@@ -16,7 +16,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  static const _base = 'http://172.17.0.36:3000';
+  static const _base = 'http://217.154.223.125:3000';
 
   @override
   Widget build(BuildContext context) {
@@ -53,7 +53,7 @@ class _RestaurantTab extends StatefulWidget {
 
 class _RestaurantTabState extends State<_RestaurantTab>
     with SingleTickerProviderStateMixin {
-  static const String _floorsUrl = 'http://172.17.0.36:3000/floors';
+  static const String _floorsUrl = 'http://217.154.223.125:3000/floors';
 
   List<Floor>? _floors;
   String? _error;
@@ -168,7 +168,7 @@ class _FloorContent extends StatefulWidget {
 }
 
 class _FloorContentState extends State<_FloorContent> {
-  static const String _placesUrl = 'http://172.17.0.36:3000/places';
+  static const String _placesUrl = 'http://217.154.223.125:3000/places';
 
   List<Place>? _places;
   String? _error;

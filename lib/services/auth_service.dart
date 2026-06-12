@@ -4,7 +4,7 @@ import '../models/user.dart';
 
 class AuthService {
   // Local backend – change host/port if running on a different machine
-  static const String _usersUrl = 'http://172.17.0.36:3000/persons';
+  static const String _usersUrl = 'http://217.154.223.125:3000/persons';
 
   // Cache so we don't re-fetch on every login attempt
   static List<User>? _cachedUsers;

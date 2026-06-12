@@ -9,8 +9,8 @@ class ProductCatalogService {
 
   static final ProductCatalogService instance = ProductCatalogService._();
 
-  static const String _productsUrl = 'http://172.17.0.36:3000/products';
-  static const String _categoriesUrl = 'http://172.17.0.36:3000/categories';
+  static const String _productsUrl = 'http://217.154.223.125:3000/products';
+  static const String _categoriesUrl = 'http://217.154.223.125:3000/categories';
 
   List<Product>? _cachedProducts;
   List<Category>? _cachedCategories;
