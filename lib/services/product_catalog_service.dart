@@ -3,20 +3,27 @@ import 'package:http/http.dart' as http;
 import 'package:orderme/models/category.dart';
 
 import '../models/product.dart';
+import 'app_settings_service.dart';
 
 class ProductCatalogService {
   ProductCatalogService._();
 
   static final ProductCatalogService instance = ProductCatalogService._();
 
-  static const String _productsUrl = 'http://217.154.223.125:3000/products';
-  static const String _categoriesUrl = 'http://217.154.223.125:3000/categories';
+  Uri get _productsUri => Uri.parse('${AppSettingsService.baseUrl}/products');
+  Uri get _categoriesUri =>
+      Uri.parse('${AppSettingsService.baseUrl}/categories');
 
   List<Product>? _cachedProducts;
   List<Category>? _cachedCategories;
 
   List<Product>? get cachedProducts => _cachedProducts;
   List<Category>? get cachedCategories => _cachedCategories;
+
+  void invalidateCache() {
+    _cachedProducts = null;
+    _cachedCategories = null;
+  }
 
   Future<List<Product>> preloadProducts() async {
     return fetchProducts();
@@ -31,7 +38,7 @@ class ProductCatalogService {
       return _cachedProducts!;
     }
 
-    final response = await http.get(Uri.parse(_productsUrl));
+    final response = await http.get(_productsUri);
     if (response.statusCode != 200) {
       throw Exception('Failed to load products (HTTP ${response.statusCode})');
     }
@@ -63,7 +70,7 @@ class ProductCatalogService {
       return _cachedCategories!;
     }
 
-    final response = await http.get(Uri.parse(_categoriesUrl));
+    final response = await http.get(_categoriesUri);
     if (response.statusCode != 200) {
       throw Exception('Failed to load categories (HTTP ${response.statusCode})');
     }

@@ -143,4 +143,27 @@ class CheckoutDialog {
 
     return confirmed ?? false;
   }
+
+  static Future<void> showAndHandle({
+    required BuildContext context,
+    required OrderItem? orderitem,
+    required String placeName,
+    required Future<void> Function() onConfirmed,
+  }) async {
+    if (orderitem == null || orderitem.lines.isEmpty) {
+      return;
+    }
+
+    final confirmed = await show(
+      context: context,
+      orderitem: orderitem,
+      placeName: placeName,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    await onConfirmed();
+  }
 }

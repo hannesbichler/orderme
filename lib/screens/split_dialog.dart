@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/orderitem.dart';
 import '../models/orderline.dart';
+import 'checkout_dialog.dart';
 
 class SplitDialog {
 	static Future<double?> show({
@@ -204,7 +205,158 @@ class SplitDialog {
 						);
 					}
 
+					final screenWidth = MediaQuery.of(ctx).size.width;
+					final isCompactLayout = screenWidth <= 700;
+
+					Widget buildTransferControls({required bool compact}) {
+						final controls = [
+							SizedBox(
+								width: compact ? 92 : 64,
+								height: 38,
+								child: ElevatedButton(
+									onPressed: selectedRowIndex == null || selectedIsSplitList == true
+											? null
+											: () {
+													moveSelectedOne();
+											  },
+									style: ElevatedButton.styleFrom(
+										backgroundColor: const Color(0xFF3A6FFF),
+										foregroundColor: Colors.white,
+										padding: EdgeInsets.zero,
+										shape: RoundedRectangleBorder(
+											borderRadius: BorderRadius.circular(8),
+										),
+									),
+									child: const Row(
+										mainAxisAlignment: MainAxisAlignment.center,
+										children: [
+											Icon(Icons.chevron_right, size: 24),
+											Text(
+												'1',
+												style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+											),
+										],
+									),
+								),
+							),
+							SizedBox(
+								width: compact ? 92 : 64,
+								height: 38,
+								child: ElevatedButton(
+									onPressed: selectedRowIndex == null || selectedIsSplitList == false
+											? null
+											: () {
+													moveSelectedOne();
+											  },
+									style: ElevatedButton.styleFrom(
+										backgroundColor: const Color(0xFF3A6FFF),
+										foregroundColor: Colors.white,
+										padding: EdgeInsets.zero,
+										shape: RoundedRectangleBorder(
+											borderRadius: BorderRadius.circular(8),
+										),
+									),
+									child: const Row(
+										mainAxisAlignment: MainAxisAlignment.center,
+										children: [
+											Icon(Icons.chevron_left, size: 24),
+											Text(
+												'1',
+												style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+											),
+										],
+									),
+								),
+							),
+							SizedBox(
+								width: compact ? 92 : 64,
+								height: 38,
+								child: ElevatedButton(
+									onPressed: selectedRowIndex == null || selectedIsSplitList == true
+											? null
+											: () {
+													moveSelectedAll();
+											  },
+									style: ElevatedButton.styleFrom(
+										backgroundColor: const Color(0xFF3A6FFF),
+										foregroundColor: Colors.white,
+										padding: EdgeInsets.zero,
+										shape: RoundedRectangleBorder(
+											borderRadius: BorderRadius.circular(8),
+										),
+									),
+									child: const Row(
+										mainAxisAlignment: MainAxisAlignment.center,
+										children: [
+											Icon(Icons.chevron_right, size: 24),
+											Text(
+												'Alle',
+												style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+											),
+										],
+									),
+								),
+							),
+							SizedBox(
+								width: compact ? 92 : 64,
+								height: 38,
+								child: ElevatedButton(
+									onPressed: selectedRowIndex == null || selectedIsSplitList == false
+											? null
+											: () {
+													moveSelectedAll();
+											  },
+									style: ElevatedButton.styleFrom(
+										backgroundColor: const Color(0xFF3A6FFF),
+										foregroundColor: Colors.white,
+										padding: EdgeInsets.zero,
+										shape: RoundedRectangleBorder(
+											borderRadius: BorderRadius.circular(8),
+										),
+									),
+									child: const Row(
+										mainAxisAlignment: MainAxisAlignment.center,
+										children: [
+											Icon(Icons.chevron_left, size: 24),
+											Text(
+												'Alle',
+												style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+											),
+										],
+									),
+								),
+							),
+						];
+
+						if (compact) {
+							return SingleChildScrollView(
+								scrollDirection: Axis.horizontal,
+								child: Row(
+									children: [
+										for (var i = 0; i < controls.length; i++) ...[
+											if (i > 0) const SizedBox(width: 8),
+											controls[i],
+										],
+									],
+								),
+							);
+						}
+
+						return Column(
+							mainAxisAlignment: MainAxisAlignment.center,
+							children: [
+								for (var i = 0; i < controls.length; i++) ...[
+									if (i > 0) const SizedBox(height: 10),
+									controls[i],
+								],
+							],
+						);
+					}
+
 					return AlertDialog(
+						insetPadding: isCompactLayout
+								? const EdgeInsets.symmetric(horizontal: 8, vertical: 16)
+								: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
 						shape:
 								RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
 						titlePadding: EdgeInsets.zero,
@@ -230,20 +382,97 @@ class SplitDialog {
 							),
 						),
 						content: SizedBox(
-							width: 640,
+							width: isCompactLayout ? screenWidth * 0.92 : 640,
 							child: Column(
 								mainAxisSize: MainAxisSize.min,
 								children: [
 									const SizedBox(height: 4),
 									ConstrainedBox(
-										constraints: const BoxConstraints(maxHeight: 380),
-										child: Row(
-											children: [
-												Expanded(
-													child: buildListSection(
-														title: 'alle Buchungen',
-														active: selectedIsSplitList != true,
-														child: ListView.separated(
+										constraints: BoxConstraints(maxHeight: isCompactLayout ? 520 : 380),
+										child: isCompactLayout
+												? Column(
+													children: [
+														Expanded(
+															child: buildListSection(
+																title: 'alle Buchungen',
+																active: selectedIsSplitList != true,
+																child: ListView.separated(
+																		itemCount: lines.length,
+																		separatorBuilder: (_, __) => const Divider(height: 1),
+																		itemBuilder: (_, index) {
+																			final line = lines[index];
+																			final remainingQty =
+																					line.qty - splitQuantities[index];
+																			if (remainingQty == 0) {
+																				return const SizedBox.shrink();
+																			}
+																			return buildLineTile(
+																				index: index,
+																				line: line,
+																				qty: remainingQty,
+																				selected: isRowSelected(index, false),
+																				onSelect: () {
+																					setDialogState(() {
+																						if (isRowSelected(index, false)) {
+																							selectedRowIndex = null;
+																							selectedIsSplitList = null;
+																						} else {
+																							selectedRowIndex = index;
+																							selectedIsSplitList = false;
+																						}
+																					});
+																				},
+																			);
+																		},
+																),
+															),
+														),
+														const SizedBox(height: 10),
+														SizedBox(height: 40, child: buildTransferControls(compact: true)),
+														const SizedBox(height: 10),
+														Expanded(
+															child: buildListSection(
+																title: 'aufgeteilte Buchung',
+																active: selectedIsSplitList == true,
+																child: ListView.separated(
+																		itemCount: lines.length,
+																		separatorBuilder: (_, __) => const Divider(height: 1),
+																		itemBuilder: (_, index) {
+																			final line = lines[index];
+																			final splitQty = splitQuantities[index];
+																			if (splitQty == 0) {
+																				return const SizedBox.shrink();
+																			}
+																			return buildLineTile(
+																				index: index,
+																				line: line,
+																				qty: splitQty,
+																				selected: isRowSelected(index, true),
+																				onSelect: () {
+																					setDialogState(() {
+																						if (isRowSelected(index, true)) {
+																							selectedRowIndex = null;
+																							selectedIsSplitList = null;
+																						} else {
+																							selectedRowIndex = index;
+																							selectedIsSplitList = true;
+																						}
+																					});
+																				},
+																			);
+																		},
+																),
+															),
+														),
+													],
+												)
+												: Row(
+													children: [
+														Expanded(
+															child: buildListSection(
+																title: 'alle Buchungen',
+																active: selectedIsSplitList != true,
+																child: ListView.separated(
 																	itemCount: lines.length,
 																	separatorBuilder: (_, __) => const Divider(height: 1),
 																	itemBuilder: (_, index) {
@@ -275,142 +504,7 @@ class SplitDialog {
 													),
 												),
 												const SizedBox(width: 12),
-												Column(
-													mainAxisAlignment: MainAxisAlignment.center,
-													children: [
-														SizedBox(
-															width: 64,
-															height: 38,
-															child: ElevatedButton(
-																onPressed: selectedRowIndex == null || selectedIsSplitList == true
-                                ? null
-                                : () {
-                                   moveSelectedOne();
-                                },
-																style: ElevatedButton.styleFrom(
-																	backgroundColor: const Color(0xFF3A6FFF),
-																	foregroundColor: Colors.white,
-																	padding: EdgeInsets.zero,
-																	shape: RoundedRectangleBorder(
-																		borderRadius: BorderRadius.circular(8),
-																	),
-																),
-																child: const Row(
-																	mainAxisAlignment: MainAxisAlignment.center,
-																	children: [
-																		Icon(Icons.chevron_right, size: 28),
-																		Text(
-																			'1',
-																			style: TextStyle(
-																				fontSize: 10,
-																				fontWeight: FontWeight.bold,
-																			),
-																		),
-																	],
-																),
-															),
-														),
-														const SizedBox(height: 10),
-														SizedBox(
-															width: 64,
-															height: 38,
-															child: ElevatedButton(
-																onPressed: selectedRowIndex == null || selectedIsSplitList == false
-                                ? null
-                                : () {
-                                   moveSelectedOne();
-                                },
-																style: ElevatedButton.styleFrom(
-																	backgroundColor: const Color(0xFF3A6FFF),
-																	foregroundColor: Colors.white,
-																	padding: EdgeInsets.zero,
-																	shape: RoundedRectangleBorder(
-																		borderRadius: BorderRadius.circular(8),
-																	),
-																),
-																child: const Row(
-																	mainAxisAlignment: MainAxisAlignment.center,
-																	children: [
-																		Icon(Icons.chevron_left, size: 28),
-																		Text(
-																			'1',
-																			style: TextStyle(
-																				fontSize: 10,
-																				fontWeight: FontWeight.bold,
-																			),
-																		),
-																	],
-																),
-															),
-														),
-														const SizedBox(height: 10),
-														SizedBox(
-															width: 64,
-															height: 38,
-															child: ElevatedButton(
-																onPressed: selectedRowIndex == null || selectedIsSplitList == true
-                                ? null
-                                : () {
-                                   moveSelectedAll();
-                                },
-																style: ElevatedButton.styleFrom(
-																	backgroundColor: const Color(0xFF3A6FFF),
-																	foregroundColor: Colors.white,
-																	padding: EdgeInsets.zero,
-																	shape: RoundedRectangleBorder(
-																		borderRadius: BorderRadius.circular(8),
-																	),
-																),
-																child: const Row(
-																	mainAxisAlignment: MainAxisAlignment.center,
-																	children: [
-																		Icon(Icons.chevron_right, size: 28),
-																		Text(
-																			'Alle',
-																			style: TextStyle(
-																				fontSize: 10,
-																				fontWeight: FontWeight.bold,
-																			),
-																		),
-																	],
-																),
-															),
-														),
-														const SizedBox(height: 10),
-														SizedBox(
-															width: 64,
-															height: 38,
-															child: ElevatedButton(
-																onPressed: selectedRowIndex == null || selectedIsSplitList == false
-                                ? null
-                                : () {
-                                   moveSelectedAll();
-                                },
-																style: ElevatedButton.styleFrom(
-																	backgroundColor: const Color(0xFF3A6FFF),
-																	foregroundColor: Colors.white,
-																	padding: EdgeInsets.zero,
-																	shape: RoundedRectangleBorder(
-																		borderRadius: BorderRadius.circular(8),
-																	),
-																),
-																child: const Row(
-																	mainAxisAlignment: MainAxisAlignment.center,
-																	children: [
-																		Icon(Icons.chevron_left, size: 28),
-																		Text(
-																			'Alle',
-																			style: TextStyle(
-																				fontSize: 10,
-																				fontWeight: FontWeight.bold,
-																			),
-																		),
-																	],
-																),
-															),
-														)
-													],
-												),
+												buildTransferControls(compact: false),
 												const SizedBox(width: 12),
 												Expanded(
 													child: buildListSection(
@@ -445,7 +539,7 @@ class SplitDialog {
 																	},
 														),
 													),
-												),
+														),
 											],
 										),
 									),
@@ -508,38 +602,55 @@ class SplitDialog {
 								label: const Text('Kassieren'),
 								onPressed: splitTotal == 0
 										? null
-										: () {
-												final originalLines = List<OrderLine>.from(lines);
-												final updatedLines = <OrderLine>[];
+										: () async {
+													final splitOrderItem = OrderItem(
+														id: 0,
+														id_: 'split-checkout',
+														tickettype: 0,
+														ticketId: 0,
+														lines: splitLines,
+													);
 
-												for (var index = 0; index < originalLines.length; index++) {
-													final line = originalLines[index];
-													final splitQty = splitQuantities[index];
-													final remainingQty = line.qty - splitQty;
+											final confirmed = await CheckoutDialog.show(
+											  context: ctx,
+												orderitem: splitOrderItem,
+												placeName: placeName,
+											);
 
-													if (remainingQty <= 0) {
-														continue;
-													}
+									    if (!confirmed) {
+										    return;
+									    }
+											final originalLines = List<OrderLine>.from(lines);
+											final updatedLines = <OrderLine>[];
 
-													updatedLines.add(OrderLine(
-														id: line.id,
-														orderId: line.orderId,
-														productId: line.productId,
-														productName: line.productName,
-														pricesell: line.pricesell,
-														qty: remainingQty,
-														attSetInstDesc: line.attSetInstDesc,
-														qtyNew: 0,
-														attributes: line.attributes,
-													));
+											for (var index = 0; index < originalLines.length; index++) {
+												final line = originalLines[index];
+												final splitQty = splitQuantities[index];
+												final remainingQty = line.qty - splitQty;
+
+												if (remainingQty <= 0) {
+													continue;
 												}
 
-												orderitem.lines
-													..clear()
-													..addAll(updatedLines);
+												updatedLines.add(OrderLine(
+													id: line.id,
+													orderId: line.orderId,
+													productId: line.productId,
+													productName: line.productName,
+													pricesell: line.pricesell,
+													qty: remainingQty,
+													attSetInstDesc: line.attSetInstDesc,
+													qtyNew: 0,
+													attributes: line.attributes,
+												));
+											}
 
-												Navigator.of(ctx).pop(splitTotal);
-											},
+											orderitem.lines
+												..clear()
+												..addAll(updatedLines);
+
+											Navigator.of(ctx).pop(splitTotal);
+										},
 							),
 						],
 					);

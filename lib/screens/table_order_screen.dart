@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:orderme/services/app_settings_service.dart';
 import '../models/category.dart';
 import '../models/orderitem.dart';
 import '../models/orderline.dart';
@@ -21,7 +22,7 @@ class TableOrderScreen extends StatefulWidget {
 }
 
 class _TableOrderScreenState extends State<TableOrderScreen> {
-  static const _base = 'http://217.154.223.125:3000';
+ // static const _base = 'http://217.154.223.125:3000';
   static const double _productButtonHeight = 80;
   static const double _panelDividerHeight = 8;
   static const double _leftMinPaneHeight = 140;
@@ -69,7 +70,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
   Future<void> _fetchOrderItem() async {
     setState(() { _orderitemError = null; _orderitem = null; });
     try {
-      final uri = Uri.parse('$_base/orderitem/${widget.place.id}');
+      final uri = Uri.parse('${AppSettingsService.baseUrl}/orderitem/${widget.place.id}/${widget.place.name}');
       final res = await http.get(uri);
       if (res.statusCode != 200) throw Exception('HTTP ${res.statusCode}');
       final body = json.decode(res.body) as Map<String, dynamic>;
@@ -177,7 +178,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
     final selectedAttributes = await ProductAttributeDialog.show(
       context: context,
       product: p,
-      baseUrl: _base,
+      baseUrl: AppSettingsService.baseUrl,
       attributeSetId: p.attributesetid,
       preselectedAttributes: preselectedAttributes,
     );
@@ -202,8 +203,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
   void _decrementLine(int idx) {
     final old = _orderitem!.lines[idx];
     if (old.qty <= 1) {
-      _orderitem!.lines.removeAt(idx);
-      setState(() => _selectedLineIdx = null);
+      _confirmDeleteOrderItemLine(idx);
     } else {
       _orderitem!.lines[idx] = OrderLine(
         id: old.id, orderId: old.orderId,
@@ -212,6 +212,57 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
       );
       setState(() {});
     }
+  }
+
+  Future<void> _confirmDeleteOrderItemLine(int idx) async {
+    if (_orderitem == null || idx < 0 || idx >= _orderitem!.lines.length) {
+      return;
+    }
+
+    final line = _orderitem!.lines[idx];
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          title: const Row(
+            children: [
+              Icon(Icons.delete_outline, color: Colors.red),
+              SizedBox(width: 8),
+              Text('Position löschen?'),
+            ],
+          ),
+          content: Text(
+            'Möchtest du "${line.productName}" wirklich aus der Buchung entfernen?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Abbrechen'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Löschen'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldDelete != true || _orderitem == null) return;
+
+    setState(() {
+      _orderitem!.lines.removeAt(idx);
+      if (_selectedLineIdx == idx) {
+        _selectedLineIdx = null;
+      } else if (_selectedLineIdx != null && _selectedLineIdx! > idx) {
+        _selectedLineIdx = _selectedLineIdx! - 1;
+      }
+    });
   }
 
  /* Future<void> _fetchCategories() async {
@@ -290,32 +341,13 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
       }
     });
   }
-  // ── Checkout dialog ──────────────────────────────────────────────────────
-
-  Future<void> _showCheckoutDialog() async {
-    if (_orderitem == null || _orderitem!.lines.isEmpty) return;
-
-    final confirmed = await CheckoutDialog.show(
-      context: context,
-      orderitem: _orderitem!,
-      placeName: widget.place.name,
-    );
-
-    if (!mounted || !confirmed) return;
-
-    setState(() {
-      _orderitem!.lines.clear();
-      _selectedLineIdx = null;
-      _numInput = '';
-    });
-  }
 
   Future<void> _showMoveTableDialog() async {
     try {
       final Place? chosenPlace = await MoveTableDialog.show(
         context: context,
         currentPlace: widget.place,
-        baseUrl: _base,
+        baseUrl: AppSettingsService.baseUrl,
       );
 
       if (!mounted || chosenPlace == null) return;
@@ -323,7 +355,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
       if (_orderitem != null && _orderitem!.id_.isNotEmpty) {
         try {
           await http.post(
-            Uri.parse('$_base/orderitem/${_orderitem!.id_}/move-table'),
+            Uri.parse('${AppSettingsService.baseUrl}/orderitem/${_orderitem!.id_}/move-table'),
             headers: {'Content-Type': 'application/json'},
             body: json.encode({
               'fromPlaceId': widget.place.id,
@@ -350,9 +382,80 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
     }
   }
 
+  Future<void> _deleteOrderItem() async {
+    if (_orderitem == null) return;
+
+    try {
+      final response = await http.delete(
+        Uri.parse('${AppSettingsService.baseUrl}/orderitem/${_orderitem!.id_}'),
+      );
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception('HTTP ${response.statusCode}');
+      }
+
+      if (!mounted) return;
+     /* ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Buchung gelöscht.')),
+      );*/
+      Navigator.of(context).maybePop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Buchung konnte nicht gelöscht werden: $e')),
+      );
+    }
+  }
+
+  Future<void> _confirmDeleteOrderItem() async {
+    if (_orderitem == null) return;
+
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.red),
+              SizedBox(width: 8),
+              Text('Buchung löschen?'),
+            ],
+          ),
+          content: Text(
+            'Möchtest du die Buchung für Tisch ${widget.place.name} wirklich löschen?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Abbrechen'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Löschen'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldDelete != true) return;
+    await _deleteOrderItem();
+  }
+
   Future<void> _saveOrderItem() async {
     if (_orderitem == null) return;
 
+  if (_orderitem!.lines.isEmpty) {
+      await _deleteOrderItem();
+      if (!mounted) return;
+      Navigator.of(context).maybePop();
+      return;
+    }
     _makeOrder();
 
     final payload = {
@@ -381,7 +484,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
 
     try {
       final response = await http.put(
-        Uri.parse('$_base/orderitem/${_orderitem!.id_}'),
+        Uri.parse('${AppSettingsService.baseUrl}/orderitem/${_orderitem!.id_}'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode(payload),
       );
@@ -415,6 +518,11 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
         foregroundColor: Colors.white,
         actions: [
           IconButton(
+            icon: const Icon(Icons.delete),
+            tooltip: 'löschen',
+            onPressed: _orderitem == null ? null : _confirmDeleteOrderItem,
+          ),
+          IconButton(
             icon: const Icon(Icons.save),
             tooltip: 'speichern',
             onPressed: _orderitem == null ? null : _saveOrderItem,
@@ -445,6 +553,12 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
                         ),
                       ),
                     );
+
+                    if(_orderitem!.lines.isEmpty) {
+                      await _deleteOrderItem();
+                      if (!mounted) return;
+                      Navigator.of(context).maybePop();
+                    }
                   },
           ),
           IconButton(
@@ -829,10 +943,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
                               shape: const CircleBorder(),
                               elevation: 1,
                             ),
-                            onPressed: () {
-                              _orderitem!.lines.removeAt(i);
-                              setState(() => _selectedLineIdx = null);
-                            },
+                            onPressed: () => _confirmDeleteOrderItemLine(i),
                             child: const Icon(Icons.delete_outline, size: 14),
                           ),
                         ),
@@ -1079,12 +1190,22 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
                                 } else if(key == '+') {
                                   _incrementLine(_selectedLineIdx!);
                                 } else if(key == 'd') {
-                                  _orderitem!.lines.removeAt(_selectedLineIdx!);
-                                  _selectedLineIdx = null;
+                                  _confirmDeleteOrderItemLine(_selectedLineIdx!);
                                 } else if(key == 'r') {
-                                  _orderitem == null || _orderitem!.lines.isEmpty
-                                  ? null
-                                  : _showCheckoutDialog();
+                                  CheckoutDialog.showAndHandle(
+                                    context: context,
+                                    orderitem: _orderitem,
+                                    placeName: widget.place.name,
+                                    onConfirmed: () async {
+                                      if (!mounted || _orderitem == null) return;
+                                      setState(() {
+                                        _orderitem!.lines.clear();
+                                        _selectedLineIdx = null;
+                                        _numInput = '';
+                                      });
+                                      await _deleteOrderItem();
+                                    },
+                                  );
                                 } else if(key == 'a') {
                                   Product? product;
                                   String? prodid;

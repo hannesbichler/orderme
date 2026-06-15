@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'services/product_catalog_service.dart';
+import 'services/app_settings_service.dart';
 import 'screens/login_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AppSettingsService.init();
   try {
     await ProductCatalogService.instance.preloadProducts();
     await ProductCatalogService.instance.preloadCategories();

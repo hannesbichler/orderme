@@ -36,6 +36,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   crypto: ^3.0.6
   http: ^1.2.1
+  shared_preferences: ^2.3.2
   two_dimensional_scrollables: ^0.3.7
   window_manager: ^0.4.3
 

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
+import '../services/product_catalog_service.dart';
 import '../utils/string_utils.dart';
 import 'home_screen.dart';
+import 'settings_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -25,6 +27,11 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _loadUsers() async {
+    setState(() {
+      _loadingUsers = true;
+      _userFetchError = null;
+    });
+
     try {
       final users = await _authService.fetchUsers();
       setState(() {
@@ -37,6 +44,21 @@ class _LoginScreenState extends State<LoginScreen> {
         _loadingUsers = false;
       });
     }
+  }
+
+  Future<void> _openSettings() async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+    );
+
+    if (!mounted || changed != true) {
+      return;
+    }
+
+    AuthService.invalidateCache();
+    ProductCatalogService.instance.invalidateCache();
+    await _loadUsers();
   }
 
   void _loginAs(User user) {
@@ -151,6 +173,15 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: TextStyle(color: Colors.grey),
               ),
               const SizedBox(height: 32),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: _openSettings,
+                  icon: const Icon(Icons.settings_rounded),
+                  label: const Text('Settings'),
+                ),
+              ),
+              const SizedBox(height: 8),
 
               // User selection card
               Card(
