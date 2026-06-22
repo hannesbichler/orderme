@@ -41,12 +41,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _initializeNFC() async {
     if (!_supportsNfcPlatform) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('NFC is not supported on this platform.')),
+      );
       return;
     }
 
     try {
       final isAvailable = await NfcManager.instance.isAvailable();
       if (!isAvailable || !mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('NFC is not available on this device.')),
+        );
         return;
       }
 
@@ -71,6 +77,13 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     } on MissingPluginException {
       // NFC plugin is not registered for this runtime.
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _userFetchError = 'NFC plugin is not available on this platform.';
+      });
     } on PlatformException {
       if (!mounted) {
         return;
