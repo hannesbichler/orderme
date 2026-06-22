@@ -5,8 +5,8 @@ class AppSettingsService {
 
   static const String _hostKey = 'webservice_host';
   static const String _portKey = 'webservice_port';
-  static const String _defaultHost = '127.0.0.1';
- // static const String _defaultHost = '217.154.223.125';
+ // static const String _defaultHost = '127.0.0.1';
+  static const String _defaultHost = '217.154.223.125';
   static const int _defaultPort = 3000;
 
   static String _host = _defaultHost;

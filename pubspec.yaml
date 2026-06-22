@@ -39,6 +39,7 @@ dependencies:
   shared_preferences: ^2.3.2
   two_dimensional_scrollables: ^0.3.7
   window_manager: ^0.4.3
+  nfc_manager: ^3.3.0
 
 dev_dependencies:
   flutter_test:
@@ -51,6 +52,7 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
 
+  
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 

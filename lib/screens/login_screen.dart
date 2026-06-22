@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
 import '../services/product_catalog_service.dart';
 import '../utils/string_utils.dart';
 import 'home_screen.dart';
 import 'settings_screen.dart';
+import 'package:nfc_manager/nfc_manager.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -23,7 +26,68 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    _initializeNFC();
     _loadUsers();
+  }
+
+  bool get _supportsNfcPlatform {
+    if (kIsWeb) {
+      return false;
+    }
+
+    return defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS;
+  }
+
+  Future<void> _initializeNFC() async {
+    if (!_supportsNfcPlatform) {
+      return;
+    }
+
+    try {
+      final isAvailable = await NfcManager.instance.isAvailable();
+      if (!isAvailable || !mounted) {
+        return;
+      }
+
+      NfcManager.instance.startSession(
+        pollingOptions: {
+          NfcPollingOption.iso14443,
+          NfcPollingOption.iso15693,
+          NfcPollingOption.iso18092,
+        },
+        onDiscovered: (NfcTag tag) async {
+          // Process tag data.
+        },
+        onError: (error) async {
+          if (!mounted) {
+            return;
+          }
+
+          setState(() {
+            _userFetchError = 'Couldn\'t read tag. Try again.';
+          });
+        },
+      );
+    } on MissingPluginException {
+      // NFC plugin is not registered for this runtime.
+    } on PlatformException {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _userFetchError = 'NFC is unavailable on this device.';
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_supportsNfcPlatform) {
+      NfcManager.instance.stopSession();
+    }
+    super.dispose();
   }
 
   Future<void> _loadUsers() async {

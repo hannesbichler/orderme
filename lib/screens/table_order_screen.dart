@@ -172,6 +172,9 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
     if(p == null) return;
     if(p.attributesetid == null || p.attributesetid!.isEmpty) {
       await _addProductToOrderItem(p);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Produkt eingefügt: ${p.name}.'), duration: const Duration(milliseconds: 500)),
+      );
       return;
     }
     final preselectedAttributes = line?.attributes;
@@ -188,6 +191,9 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
       selectedAttributes: selectedAttributes,
       orderLine: line,
     );
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Produkt eingefügt: ${p.name}.'), duration: const Duration(milliseconds: 500)),
+      );
   }
 
   void _incrementLine(int idx) {
