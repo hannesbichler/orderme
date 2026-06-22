@@ -145,7 +145,7 @@ class CheckoutDialog {
     return confirmed ?? false;
   }
 
-static Future<void> makePayment() async {
+  static Future<void> makePayment({required BuildContext context}) async {
 
     // To store apple payment data
     dynamic applePaymentData;
@@ -175,10 +175,16 @@ static Future<void> makePayment() async {
         );
 
         // This logs the Apple Pay response data
+        ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Payment successful!'), duration: Duration(milliseconds: 500))
+      );
         print(applePaymentData.toString());
 
         } on PlatformException {
             print('Failed payment');
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Payment failed!'), duration: Duration(milliseconds: 500))
+            ); 
         }
      }
 
@@ -202,7 +208,7 @@ static Future<void> makePayment() async {
       return;
     }
 
-    await makePayment();
+    await makePayment(context: context);
 
     await onConfirmed();
   }
