@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-
+import 'package:apple_pay_flutter/apple_pay_flutter.dart';
+import 'package:flutter/services.dart';
 import '../models/orderitem.dart';
 
 class CheckoutDialog {
@@ -144,6 +145,43 @@ class CheckoutDialog {
     return confirmed ?? false;
   }
 
+static Future<void> makePayment() async {
+
+    // To store apple payment data
+    dynamic applePaymentData;
+
+    // List of items with label & price
+    List<PaymentItem> paymentItems = [
+      PaymentItem(label: 'Label', amount: 1.00,shippingcharge: 2.00)
+    ];
+
+    try {
+        // initiate payment
+        applePaymentData = await ApplePayFlutter.makePayment(
+            countryCode: "US",
+            currencyCode: "SAR",
+            paymentNetworks: [
+                PaymentNetwork.visa,
+                PaymentNetwork.mastercard,
+                PaymentNetwork.amex,
+                PaymentNetwork.mada
+            ],
+            merchantIdentifier: "merchant.demo.tech.demoApplePayId",
+            paymentItems: paymentItems,
+            customerEmail: "demo.user@business.com",
+            customerName: "Demo User",
+            companyName: "Demo Company",
+        
+        );
+
+        // This logs the Apple Pay response data
+        print(applePaymentData.toString());
+
+        } on PlatformException {
+            print('Failed payment');
+        }
+     }
+
   static Future<void> showAndHandle({
     required BuildContext context,
     required OrderItem? orderitem,
@@ -163,6 +201,8 @@ class CheckoutDialog {
     if (!confirmed) {
       return;
     }
+
+    await makePayment();
 
     await onConfirmed();
   }

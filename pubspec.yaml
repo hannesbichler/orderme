@@ -40,6 +40,7 @@ dependencies:
   two_dimensional_scrollables: ^0.3.7
   window_manager: ^0.4.3
   nfc_manager: ^3.3.0
+  apple_pay_flutter: ^1.0.4
 
 dev_dependencies:
   flutter_test:
