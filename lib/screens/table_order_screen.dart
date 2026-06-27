@@ -7,6 +7,7 @@ import '../models/orderitem.dart';
 import '../models/orderline.dart';
 import '../models/place.dart';
 import '../models/product.dart';
+import '../models/user.dart';
 import '../services/product_catalog_service.dart';
 import 'checkout_dialog.dart';
 import 'move_table_dialog.dart';
@@ -15,7 +16,8 @@ import 'split_dialog.dart';
 
 class TableOrderScreen extends StatefulWidget {
   final Place place;
-  const TableOrderScreen({super.key, required this.place});
+  final User user;
+  const TableOrderScreen({super.key, required this.place, required this.user});
 
   @override
   State<TableOrderScreen> createState() => _TableOrderScreenState();
@@ -70,7 +72,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
   Future<void> _fetchOrderItem() async {
     setState(() { _orderitemError = null; _orderitem = null; });
     try {
-      final uri = Uri.parse('${AppSettingsService.baseUrl}/orderitem/${widget.place.id}/${widget.place.name}');
+      final uri = Uri.parse('${AppSettingsService.baseUrl}/orderitem/${widget.place.id}/${widget.place.name}/${widget.user.name}');
       final res = await http.get(uri);
       if (res.statusCode != 200) throw Exception('HTTP ${res.statusCode}');
       final body = json.decode(res.body) as Map<String, dynamic>;
@@ -124,7 +126,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
         _orderitem!.lines[idx2] = OrderLine(
           id: orderLine.id, orderId: orderLine.orderId,
           productId: orderLine.productId, productName: orderLine.productName,
-          pricesell: orderLine.pricesell, qty: orderLine.qty, attSetInstDesc: attributes.join(', '), qtyNew: orderLine.qtyNew, attributes: selectedAttributes,
+          pricesell: orderLine.pricesell, qty: orderLine.qty, attSetInstDesc: attributes.join(', '), newQty: orderLine.newQty, attributes: selectedAttributes,
         );
       }
     }
@@ -133,13 +135,13 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
       _orderitem!.lines[idx] = OrderLine(
         id: old.id, orderId: old.orderId,
         productId: old.productId, productName: old.productName,
-        pricesell: old.pricesell, qty: old.qty + qty, attSetInstDesc: old.attSetInstDesc, qtyNew: old.qtyNew + qty, attributes: old.attributes,
+        pricesell: old.pricesell, qty: old.qty + qty, attSetInstDesc: old.attSetInstDesc, newQty: old.newQty + qty, attributes: old.attributes,
       );
     } else {
       _orderitem!.lines.add(OrderLine(
         id: '', orderId: _orderitem!.id_,
         productId: p.id, productName: p.name,
-        pricesell: p.pricesell, qty: qty, attSetInstDesc: attributes.join(', '), qtyNew: qty, attributes: selectedAttributes,
+        pricesell: p.pricesell, qty: qty, attSetInstDesc: attributes.join(', '), newQty: qty, attributes: selectedAttributes,
       ));
     }
     setState(() {});
@@ -201,7 +203,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
     _orderitem!.lines[idx] = OrderLine(
       id: old.id, orderId: old.orderId,
       productId: old.productId, productName: old.productName,
-      pricesell: old.pricesell, qty: old.qty + 1, attSetInstDesc: old.attSetInstDesc, qtyNew: old.qtyNew + 1, attributes: old.attributes,
+      pricesell: old.pricesell, qty: old.qty + 1, attSetInstDesc: old.attSetInstDesc, newQty: old.newQty + 1, attributes: old.attributes,
     );
     setState(() {});
   }
@@ -214,7 +216,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
       _orderitem!.lines[idx] = OrderLine(
         id: old.id, orderId: old.orderId,
         productId: old.productId, productName: old.productName,
-        pricesell: old.pricesell, qty: old.qty - 1, attSetInstDesc: old.attSetInstDesc, qtyNew: old.qtyNew - 1, attributes: old.attributes,
+        pricesell: old.pricesell, qty: old.qty - 1, attSetInstDesc: old.attSetInstDesc, newQty: old.newQty - 1, attributes: old.attributes,
       );
       setState(() {});
     }
@@ -343,7 +345,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
     // Reset "new" quantity marker after checkout is completed.
     setState(() {
       for (var i = 0; i < _orderitem!.lines.length; i++) {
-        _orderitem!.lines[i].setQtyNew( 0);
+        _orderitem!.lines[i].setNewQty(0);
       }
     });
   }
@@ -377,7 +379,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => TableOrderScreen(place: chosenPlace),
+          builder: (_) => TableOrderScreen(place: chosenPlace, user: widget.user),
         ),
       );
     } catch (e) {
@@ -388,23 +390,52 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
     }
   }
 
+  OrderItem? _buildReplacementOrderItemForDelete() {
+    final currentOrderItem = _orderitem;
+    if (currentOrderItem == null) {
+      return null;
+    }
+
+    final remainingLines = currentOrderItem.lines
+        .where((line) => line.qty - line.newQty != 0)
+        .map(
+          (line) => OrderLine(
+            id: line.id,
+            orderId: line.orderId,
+            productId: line.productId,
+            productName: line.productName,
+            pricesell: line.pricesell,
+            qty: 0,//line.newQty,
+            attSetInstDesc: line.attSetInstDesc,
+            newQty: line.newQty - line.qty,
+            attributes: line.attributes,
+          ),
+        )
+        .toList();
+
+   /* if (remainingLines.isEmpty) {
+      return null;
+    }*/
+
+    return OrderItem(
+      id: currentOrderItem.id,
+      id_: currentOrderItem.id_,
+      tickettype: currentOrderItem.tickettype,
+      ticketId: currentOrderItem.ticketId,
+      lockby: "",//currentOrderItem.lockby,
+      lines: remainingLines,
+    );
+  }
+
   Future<void> _deleteOrderItem() async {
     if (_orderitem == null) return;
+    final   _orderitemCleared = _buildReplacementOrderItemForDelete();
 
     try {
-      final response = await http.delete(
-        Uri.parse('${AppSettingsService.baseUrl}/orderitem/${_orderitem!.id_}'),
-      );
-
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw Exception('HTTP ${response.statusCode}');
-      }
-
-      if (!mounted) return;
-     /* ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Buchung gelöscht.')),
-      );*/
-      Navigator.of(context).maybePop();
+      await _saveOrderItem(_orderitemCleared!);
+      setState(() {
+        _orderitem = _orderitemCleared;
+      });
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -451,24 +482,18 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
 
     if (shouldDelete != true) return;
     await _deleteOrderItem();
+    Navigator.of(context).maybePop();
   }
 
-  Future<void> _saveOrderItem() async {
-    if (_orderitem == null) return;
-
-  if (_orderitem!.lines.isEmpty) {
-      await _deleteOrderItem();
-      if (!mounted) return;
-      Navigator.of(context).maybePop();
-      return;
-    }
-    _makeOrder();
+  Future<void> _saveOrderItem(OrderItem orderItem) async {
+    if (orderItem == null) return;
 
     final payload = {
-      'id': _orderitem!.id,
+      'id': orderItem.id,
       'placeId': widget.place.id,
+      'lockby': orderItem.lockby,
      // 'status': _orderitem!.status,
-      'lines': _orderitem!.lines
+      'lines': orderItem.lines
           .map((line) => {
                 'id': line.id,
                 'orderId': line.orderId,
@@ -476,7 +501,8 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
                 'productName': line.productName,
                 'pricesell': line.pricesell,
                 'qty': line.qty,
-                'quantity': line.qty,
+                'newQty': line.newQty,
+                'kellner' : widget.user.name,
                 'attSetInstDesc': line.attSetInstDesc ?? '',
                 'attributes': (line.attributes ?? const <Attribute>[])
                     .map((a) => {
@@ -490,7 +516,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
 
     try {
       final response = await http.put(
-        Uri.parse('${AppSettingsService.baseUrl}/orderitem/${_orderitem!.id_}'),
+        Uri.parse('${AppSettingsService.baseUrl}/orderitem/${orderItem.id_}'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode(payload),
       );
@@ -503,13 +529,46 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Order saved.')),
       );
-      Navigator.of(context).maybePop();
+      //Navigator.of(context).maybePop();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to save order: $e')),
       );
     }
+    _makeOrder();
+  }
+
+  OrderItem _orderItemWithoutLines(OrderItem source) {
+    return OrderItem(
+      id: source.id,
+      id_: source.id_,
+      tickettype: source.tickettype,
+      ticketId: source.ticketId,
+      lockby: "",//source.lockby,
+      lines: const [],
+    );
+  }
+
+   OrderItem _orderItemWithoutLockBy(OrderItem source) {
+    return OrderItem(
+      id: source.id,
+      id_: source.id_,
+      tickettype: source.tickettype,
+      ticketId: source.ticketId,
+      lockby: "",//source.lockby,
+      lines: source.lines.map((line) => OrderLine(
+        id: line.id,
+        orderId: line.orderId,
+        productId: line.productId,
+        productName: line.productName,
+        pricesell: line.pricesell,
+        qty: line.qty,
+        newQty: line.newQty,
+        attSetInstDesc: line.attSetInstDesc,
+        attributes: line.attributes,
+      )).toList(),
+    );
   }
 
   // ── Build ────────────────────────────────────────────────────────────────
@@ -531,7 +590,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
           IconButton(
             icon: const Icon(Icons.save),
             tooltip: 'speichern',
-            onPressed: _orderitem == null ? null : _saveOrderItem,
+            onPressed: _orderitem == null ? null : () async { await _saveOrderItem(_orderItemWithoutLockBy(_orderitem!)); Navigator.of(context).maybePop(); },
           ),
           IconButton(
             icon: const Icon(Icons.call_split),
@@ -539,7 +598,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
             onPressed: _orderitem == null || _orderitem!.lines.isEmpty
                 ? null
                 : () async {
-                    _makeOrder();
+                    await _saveOrderItem(_orderitem!);
                     final splitTotal = await SplitDialog.show(
                       context: context,
                       orderitem: _orderitem!,
@@ -561,7 +620,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
                     );
 
                     if(_orderitem!.lines.isEmpty) {
-                      await _deleteOrderItem();
+                      await _saveOrderItem(_orderItemWithoutLines(_orderitem!));
                       if (!mounted) return;
                       Navigator.of(context).maybePop();
                     }
@@ -686,48 +745,27 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
   }
 
   Widget _buildPhoneLayout() {
-    return DefaultTabController(
-      length: 2,
-      child: Column(
-        children: [
-          Container(
-            color: Colors.white,
-            child: const TabBar(
-              labelColor: Color(0xFF1A237E),
-              indicatorColor: Color(0xFF3A6FFF),
-              tabs: [
-                Tab(/*icon: Icon(Icons.receipt_long),*/ text: 'Buchungen'),
-                Tab(/*icon: Icon(Icons.fastfood_outlined),*/ text: 'Produkte'),
-              ],
-            ),
+    return Column(
+      children: [
+        SizedBox(
+          height: 220,
+          child: _SectionCard(
+            title: 'Buchungen',
+            icon: Icons.receipt_long,
+            child: _buildOrdersList(),
           ),
-          Expanded(
-            child: TabBarView(
-              children: [
-                _SectionCard(
-                  title: 'Buchungen',
-                  icon: Icons.receipt_long,
-                  child: _buildOrdersList(),
-                ),
-                Column(
-                  children: [
-                    SizedBox(height: 56, child: _buildMobileCategoryStrip()),
-                    Expanded(
-                      child: _SectionCard(
-                        title: _selectedCategory != null
-                            ? 'Produkte – ${_selectedCategory!.name}'
-                            : 'Produkte',
-                        icon: Icons.fastfood_outlined,
-                        child: _buildProductsGrid(),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+        ),
+        SizedBox(height: 56, child: _buildMobileCategoryStrip()),
+        Expanded(
+          child: _SectionCard(
+            title: _selectedCategory != null
+                ? 'Produkte – ${_selectedCategory!.name}'
+                : 'Produkte',
+            icon: Icons.fastfood_outlined,
+            child: _buildProductsGrid(),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -892,9 +930,9 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
                         padding:
                             const EdgeInsets.symmetric(horizontal: 5),
                         child: Text(
-                          line.qty == line.qtyNew
+                          line.qty == line.newQty
                               ? '${line.qty}'
-                              : '${line.qty} (${line.qtyNew})',
+                              : '${line.qty} (${line.newQty})',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: selected
@@ -1198,6 +1236,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
                                 } else if(key == 'd') {
                                   _confirmDeleteOrderItemLine(_selectedLineIdx!);
                                 } else if(key == 'r') {
+                                  _saveOrderItem(_orderitem!);
                                   CheckoutDialog.showAndHandle(
                                     context: context,
                                     orderitem: _orderitem,
@@ -1205,11 +1244,11 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
                                     onConfirmed: () async {
                                       if (!mounted || _orderitem == null) return;
                                       setState(() {
-                                        _orderitem!.lines.clear();
                                         _selectedLineIdx = null;
                                         _numInput = '';
                                       });
-                                      await _deleteOrderItem();
+                                      await _saveOrderItem(_orderItemWithoutLines(_orderitem!));
+                                      Navigator.of(context).maybePop();
                                     },
                                   );
                                 } else if(key == 'a') {

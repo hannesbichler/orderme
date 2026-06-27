@@ -5,6 +5,7 @@ class OrderItem {
   final String id_;
   final int tickettype;
   final int ticketId;
+  final String lockby;
 //  final String placeId;
   //final String table;
   //final String status;
@@ -16,6 +17,7 @@ class OrderItem {
     required this.id_,
     required this.tickettype,
     required this.ticketId,
+    this.lockby = '',
     //required this.placeId,
     //required this.table,
     //required this.status,
@@ -34,10 +36,11 @@ class OrderItem {
         : <OrderLine>[];
 
     return OrderItem(
-      id:      json['id'] as int? ?? 0,
-      id_:      json['id_'] as String? ?? '',
+      id:         json['id'] as int? ?? 0,
+      id_:        json['id_'] as String? ?? '',
       tickettype: json['tickettype'] as int? ?? 0,
       ticketId:   json['ticketId'] as int? ?? 0,
+      lockby:     json['lockby'] as String? ?? '',
      // placeId: json['placeId'] as String? ?? '',
       //table:   json['table'] as String? ?? '',
      // status:  'open', //json['status'] as String? ?? 'open',

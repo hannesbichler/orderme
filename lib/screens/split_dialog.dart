@@ -35,7 +35,7 @@ class SplitDialog {
 								pricesell: line.pricesell,
 								qty: splitQty,
                 attSetInstDesc: line.attSetInstDesc,
-								qtyNew: 0,
+								newQty: 0,
                 attributes: line.attributes,
 							));
 						}
@@ -640,7 +640,7 @@ class SplitDialog {
 													pricesell: line.pricesell,
 													qty: remainingQty,
 													attSetInstDesc: line.attSetInstDesc,
-													qtyNew: 0,
+													newQty: 0,
 													attributes: line.attributes,
 												));
 											}

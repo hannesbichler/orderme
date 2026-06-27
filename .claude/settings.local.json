@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Recurse -Path \"C:\\\\BTech\\\\java\\\\w4cash_webserver\\\\rest\\\\src\" -Directory)",
+      "Bash(Select-Object FullName)",
+      "Bash(Sort-Object FullName)",
+      "PowerShell($env:JAVA_HOME = \\(Get-Command java -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source | Split-Path | Split-Path\\); if \\(-not $env:JAVA_HOME\\) { Get-ChildItem \"C:\\\\Program Files\\\\Java\",\"C:\\\\Program Files\\\\Eclipse Adoptium\",\"C:\\\\Program Files\\\\Microsoft\" -ErrorAction SilentlyContinue | Where-Object { $_.Name -match \"jdk|java\" } | Select-Object FullName })",
+      "PowerShell($env:JAVA_HOME = \"C:\\\\Program Files \\(x86\\)\\\\Java\\\\jdk-24.0.2\"; cd C:\\\\BTech\\\\java\\\\w4cash_webserver; .\\\\mvnw -pl rest test 2>&1 | Select-Object -Last 80)",
+      "PowerShell($env:JAVA_HOME = \"C:\\\\Program Files \\(x86\\)\\\\Java\\\\jdk-24.0.2\"; cd C:\\\\BTech\\\\java\\\\w4cash_webserver\\\\rest; ..\\\\mvnw test 2>&1 | Select-Object -Last 80)",
+      "PowerShell($env:JAVA_HOME = \"C:\\\\Program Files \\(x86\\)\\\\Java\\\\jdk-24.0.2\"; cd C:\\\\BTech\\\\java\\\\w4cash_webserver\\\\rest; ..\\\\mvnw test 2>&1 | Select-Object -Last 50)",
+      "PowerShell($env:JAVA_HOME = \"C:\\\\Program Files \\(x86\\)\\\\Java\\\\jdk-24.0.2\"; cd C:\\\\BTech\\\\java\\\\w4cash_webserver\\\\rest; ..\\\\mvnw test 2>&1 | Select-Object -Last 30)"
+    ]
+  }
+}

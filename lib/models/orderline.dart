@@ -10,7 +10,7 @@ class OrderLine {
   final int qty;
   final String? attSetInstDesc;
   final List<Attribute>? attributes;
-  int qtyNew;
+  int newQty;
 
   OrderLine({
     required this.id,
@@ -21,11 +21,11 @@ class OrderLine {
     required this.qty,
     required this.attSetInstDesc,
     required this.attributes,
-    required this.qtyNew,
+    required this.newQty,
   });
 
-  int getQtyNew() => qtyNew;
-  setQtyNew(int value) => qtyNew = value;
+  int getNewQty() => newQty;
+  setNewQty(int value) => newQty = value;
 
   factory OrderLine.fromJson(Map<String, dynamic> json) {
     final parsedAttributes = _parseAttributes(
@@ -46,7 +46,7 @@ class OrderLine {
       productName: string_utils.unescape(json['productName'] as String? ?? ''),
       pricesell:   (json['pricesell'] as num? ?? 0).toDouble(),
       qty:         (json['quantity'] as num? ?? json['qty'] as num? ?? 1).toInt(),
-      qtyNew:      0, // (json['qtyNew'] as num? ?? 0).toInt(),
+      newQty:      0, // (json['newQty'] as num? ?? 0).toInt(),
       attSetInstDesc: attSetInstDesc,
       attributes: fallbackAttributes,
     );

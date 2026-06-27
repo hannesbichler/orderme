@@ -208,7 +208,7 @@ class CheckoutDialog {
       return;
     }
 
-    await makePayment(context: context);
+    //await makePayment(context: context);
 
     await onConfirmed();
   }

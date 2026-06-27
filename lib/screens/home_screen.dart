@@ -38,7 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       backgroundColor: const Color(0xFFF0F4FF),
-      body: const _RestaurantTab(),
+      body: _RestaurantTab(user: widget.user),
     );
   }
 }
@@ -46,7 +46,8 @@ class _HomeScreenState extends State<HomeScreen> {
 // ── Restaurant tab ────────────────────────────────────────────────────────────
 
 class _RestaurantTab extends StatefulWidget {
-  const _RestaurantTab();
+  final User user;
+  const _RestaurantTab({required this.user});
 
   @override
   State<_RestaurantTab> createState() => _RestaurantTabState();
@@ -150,7 +151,7 @@ final List<dynamic> data = json.decode(response.body)['_embedded']['floorList'] 
           child: TabBarView(
             controller: _floorTabController,
             children: _floors!
-                .map((f) => _FloorContent(floor: f))
+                .map((f) => _FloorContent(floor: f, user: widget.user))
                 .toList(),
           ),
         ),
@@ -161,7 +162,8 @@ final List<dynamic> data = json.decode(response.body)['_embedded']['floorList'] 
 
 class _FloorContent extends StatefulWidget {
   final Floor floor;
-  const _FloorContent({required this.floor});
+  final User user;
+  const _FloorContent({required this.floor, required this.user});
 
   @override
   State<_FloorContent> createState() => _FloorContentState();
@@ -242,7 +244,7 @@ class _FloorContentState extends State<_FloorContent> {
         itemCount: _places!.length,
         itemBuilder: (context, index) {
           final place = _places![index];
-          return _TableButton(place: place);
+          return _TableButton(place: place, user: widget.user);
         },
       ),
     );
@@ -251,7 +253,8 @@ class _FloorContentState extends State<_FloorContent> {
 
 class _TableButton extends StatelessWidget {
   final Place place;
-  const _TableButton({required this.place});
+  final User user;
+  const _TableButton({required this.place, required this.user});
 
   @override
   Widget build(BuildContext context) {
@@ -270,7 +273,7 @@ class _TableButton extends StatelessWidget {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => TableOrderScreen(place: place),
+            builder: (_) => TableOrderScreen(place: place, user: user),
           ),
         );
       },

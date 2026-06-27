@@ -26,7 +26,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeNFC();
+    //_initializeNFC();
     _loadUsers();
   }
 
