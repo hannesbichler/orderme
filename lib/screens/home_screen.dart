@@ -25,7 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('W4CASH'),
+        title: Text(widget.user.name),
         backgroundColor: const Color(0xFF3A6FFF),
         foregroundColor: Colors.white,
         actions: [

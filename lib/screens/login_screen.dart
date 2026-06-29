@@ -29,6 +29,9 @@ class _LoginScreenState extends State<LoginScreen> {
     super.initState();
     //_initializeNFC();
     _loadUsers();
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _tryAutoPhoneLogin());
+    }
   }
 
   bool get _supportsNfcPlatform {
@@ -140,12 +143,33 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _loginAs(User user) {
+    if (defaultTargetPlatform == TargetPlatform.iOS && user.card.isNotEmpty) {
+      OtpService.instance.savePhone(user.card);
+    }
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
         builder: (_) => HomeScreen(user: user),
       ),
     );
+  }
+
+  Future<void> _tryAutoPhoneLogin() async {
+    if (!mounted) return;
+    String? phone;
+    try {
+      phone = await OtpService.instance.getSavedPhone();
+    } catch (_) {}
+    if (phone == null || phone.isEmpty || !mounted) return;
+
+    bool sent = false;
+    try {
+      sent = await OtpService.instance.sendOtp(phone);
+    } catch (_) {}
+    if (!sent || !mounted) return;
+
+    // Show OTP dialog immediately — phone is already known
+    await _verifyOtpDialog(phone);
   }
 
   Future<void> _loginWithPhone() async {
@@ -200,7 +224,11 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    // Step 2 — enter OTP
+    await _verifyOtpDialog(phone);
+  }
+
+  Future<void> _verifyOtpDialog(String phone) async {
+    final otpController = TextEditingController();
     final otp = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -252,7 +280,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _handleUserTap(User user) async {
     if (user.password.trim().isEmpty) {
-      await _offerPhoneRegistration(user);
       _loginAs(user);
       return;
     }
@@ -261,7 +288,6 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted || enteredPassword == null) return;
     String passwd = sha1FromString(enteredPassword);
     if (passwd == user.password) {
-      await _offerPhoneRegistration(user);
       _loginAs(user);
       return;
     }
@@ -271,70 +297,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Future<void> _offerPhoneRegistration(User user) async {
-    if (defaultTargetPlatform != TargetPlatform.iOS) return;
-    if (!mounted) return;
-
-    final register = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        title: const Text('Telefonnummer hinterlegen?'),
-        content: const Text(
-            'Möchtest du deine Telefonnummer hinterlegen, um dich künftig per SMS-Code anzumelden?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Nein'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Ja'),
-          ),
-        ],
-      ),
-    );
-
-    if (register != true || !mounted) return;
-
-    final phoneController = TextEditingController();
-    final phone = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        title: const Text('Telefonnummer'),
-        content: TextField(
-          controller: phoneController,
-          autofocus: true,
-          keyboardType: TextInputType.phone,
-          autofillHints: const [AutofillHints.telephoneNumber],
-          decoration: const InputDecoration(
-            labelText: 'Telefonnummer',
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.phone),
-          ),
-          onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Abbrechen'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(phoneController.text.trim()),
-            child: const Text('Speichern'),
-          ),
-        ],
-      ),
-    );
-
-    phoneController.dispose();
-    if (!mounted || phone == null || phone.isEmpty) return;
-
-    try {
-      await OtpService.instance.registerPhone(user.id, phone);
-    } catch (_) {}
-  }
 
   Future<String?> _showPasswordDialog(User user) async {
     final controller = TextEditingController();
