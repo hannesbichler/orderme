@@ -8,7 +8,9 @@ import '../models/orderline.dart';
 import '../models/place.dart';
 import '../models/product.dart';
 import '../models/user.dart';
+import '../services/chat_service.dart';
 import '../services/product_catalog_service.dart';
+import 'chat_screen.dart';
 import 'checkout_dialog.dart';
 import 'move_table_dialog.dart';
 import 'product_attribute_dialog.dart';
@@ -31,7 +33,6 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
   static const double _numpadMinHeight = 170;
   static const double _numpadCollapsedHeight = 56;
   static const double _productsMinHeight = 120;
-  final buttonsEnabledInLine = false; // set to false to hide + and - buttons in order lines
   // OrderItem (top-left)
   OrderItem? _orderitem;
   String? _orderitemError;
@@ -492,6 +493,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
       'id': orderItem.id,
       'placeId': widget.place.id,
       'lockby': orderItem.lockby,
+      'kellner': widget.user.name,
      // 'status': _orderitem!.status,
       'lines': orderItem.lines
           .map((line) => {
@@ -575,6 +577,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
@@ -582,6 +585,61 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
         backgroundColor: const Color(0xFF3A6FFF),
         foregroundColor: Colors.white,
         actions: [
+          ValueListenableBuilder<int>(
+            valueListenable: ChatService.instance.unreadCount,
+            builder: (context, count, _) {
+              return Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.chat_bubble_outline),
+                    tooltip: 'Chat',
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => ChatScreen(user: widget.user)),
+                    ),
+                  ),
+                  if (count > 0)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        width: 9,
+                        height: 9,
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+          if (screenWidth < 700)
+          IconButton(
+            icon: const Icon(Icons.receipt),
+            tooltip: 'Rechnung',
+            onPressed: _orderitem == null || _orderitem!.lines.isEmpty
+                ? null
+                : () {
+                    _saveOrderItem(_orderitem!);
+                    CheckoutDialog.showAndHandle(
+                      context: context,
+                      orderitem: _orderitem,
+                      placeName: widget.place.name,
+                      onConfirmed: () async {
+                        if (!mounted || _orderitem == null) return;
+                        setState(() {
+                          _selectedLineIdx = null;
+                          _numInput = '';
+                        });
+                        await _saveOrderItem(_orderItemWithoutLines(_orderitem!));
+                        Navigator.of(context).maybePop();
+                      },
+                    );
+                  },
+          ),
           IconButton(
             icon: const Icon(Icons.delete),
             tooltip: 'löschen',
@@ -868,6 +926,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
           ),
         ),*/
         const Divider(height: 1),
+
         Expanded(
           child: ListView.separated(
             padding: const EdgeInsets.all(8),
@@ -909,7 +968,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
                       SizedBox(
                         width: 24,
                         height: 24,
-                        child: selected && buttonsEnabledInLine
+                        child: selected && _isNumpadCollapsed
                             ? ElevatedButton(
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor:
@@ -945,7 +1004,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
                       SizedBox(
                         width: 24,
                         height: 24,
-                        child: selected && buttonsEnabledInLine
+                        child: selected && _isNumpadCollapsed
                             ? ElevatedButton(
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor:
@@ -973,7 +1032,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      if (selected && buttonsEnabledInLine) ...[
+                      if (selected && _isNumpadCollapsed) ...[
                         const SizedBox(width: 4),
                         SizedBox(
                           width: 24,

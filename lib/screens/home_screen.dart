@@ -5,6 +5,8 @@ import 'package:orderme/services/app_settings_service.dart';
 import '../models/floor.dart';
 import '../models/place.dart';
 import '../models/user.dart';
+import '../services/chat_service.dart';
+import 'chat_screen.dart';
 import 'login_screen.dart';
 import 'table_order_screen.dart';
 
@@ -27,6 +29,37 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: const Color(0xFF3A6FFF),
         foregroundColor: Colors.white,
         actions: [
+          ValueListenableBuilder<int>(
+            valueListenable: ChatService.instance.unreadCount,
+            builder: (context, count, _) {
+              return Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.chat_bubble_outline),
+                    tooltip: 'Chat',
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => ChatScreen(user: widget.user)),
+                    ),
+                  ),
+                  if (count > 0)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        width: 9,
+                        height: 9,
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Logout',

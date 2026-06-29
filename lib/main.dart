@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'services/product_catalog_service.dart';
 import 'services/app_settings_service.dart';
+import 'services/chat_service.dart';
 import 'screens/login_screen.dart';
 
 Future<void> main() async {
@@ -12,6 +13,7 @@ Future<void> main() async {
   } catch (_) {
     // Product cache can be loaded lazily by screens if startup preload fails.
   }
+  ChatService.instance.startPolling();
 
   runApp(const OrderMeApp());
 }
