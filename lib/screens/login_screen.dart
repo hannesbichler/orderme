@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
+import '../services/otp_service.dart';
 import '../services/product_catalog_service.dart';
 import '../utils/string_utils.dart';
 import 'home_screen.dart';
@@ -147,8 +148,111 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  Future<void> _loginWithPhone() async {
+    final phoneController = TextEditingController();
+    final otpController = TextEditingController();
+
+    // Step 1 — enter phone number
+    final phone = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: const Text('Anmeldung per Telefon'),
+        content: TextField(
+          controller: phoneController,
+          autofocus: true,
+          keyboardType: TextInputType.phone,
+          autofillHints: const [AutofillHints.telephoneNumber],
+          decoration: const InputDecoration(
+            labelText: 'Telefonnummer',
+            border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.phone),
+          ),
+          onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Abbrechen'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(phoneController.text.trim()),
+            child: const Text('Code senden'),
+          ),
+        ],
+      ),
+    );
+
+    phoneController.dispose();
+    if (!mounted || phone == null || phone.isEmpty) return;
+
+    // Send OTP
+    bool sent = false;
+    try {
+      sent = await OtpService.instance.sendOtp(phone);
+    } catch (_) {}
+
+    if (!mounted) return;
+    if (!sent) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Keine Nummer gefunden. Bitte zuerst Nummer registrieren.')),
+      );
+      return;
+    }
+
+    // Step 2 — enter OTP
+    final otp = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: const Text('Code eingeben'),
+        content: TextField(
+          controller: otpController,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          maxLength: 6,
+          decoration: const InputDecoration(
+            labelText: '6-stelliger Code',
+            border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.lock_outline),
+          ),
+          onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Abbrechen'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(otpController.text.trim()),
+            child: const Text('Bestätigen'),
+          ),
+        ],
+      ),
+    );
+
+    otpController.dispose();
+    if (!mounted || otp == null || otp.isEmpty) return;
+
+    User? user;
+    try {
+      user = await OtpService.instance.verifyOtp(phone, otp);
+    } catch (_) {}
+
+    if (!mounted) return;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ungültiger Code.')),
+      );
+      return;
+    }
+
+    _loginAs(user);
+  }
+
   Future<void> _handleUserTap(User user) async {
     if (user.password.trim().isEmpty) {
+      await _offerPhoneRegistration(user);
       _loginAs(user);
       return;
     }
@@ -157,6 +261,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted || enteredPassword == null) return;
     String passwd = sha1FromString(enteredPassword);
     if (passwd == user.password) {
+      await _offerPhoneRegistration(user);
       _loginAs(user);
       return;
     }
@@ -164,6 +269,71 @@ class _LoginScreenState extends State<LoginScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Invalid password.')),
     );
+  }
+
+  Future<void> _offerPhoneRegistration(User user) async {
+    if (defaultTargetPlatform != TargetPlatform.iOS) return;
+    if (!mounted) return;
+
+    final register = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: const Text('Telefonnummer hinterlegen?'),
+        content: const Text(
+            'Möchtest du deine Telefonnummer hinterlegen, um dich künftig per SMS-Code anzumelden?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Nein'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Ja'),
+          ),
+        ],
+      ),
+    );
+
+    if (register != true || !mounted) return;
+
+    final phoneController = TextEditingController();
+    final phone = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: const Text('Telefonnummer'),
+        content: TextField(
+          controller: phoneController,
+          autofocus: true,
+          keyboardType: TextInputType.phone,
+          autofillHints: const [AutofillHints.telephoneNumber],
+          decoration: const InputDecoration(
+            labelText: 'Telefonnummer',
+            border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.phone),
+          ),
+          onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Abbrechen'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(phoneController.text.trim()),
+            child: const Text('Speichern'),
+          ),
+        ],
+      ),
+    );
+
+    phoneController.dispose();
+    if (!mounted || phone == null || phone.isEmpty) return;
+
+    try {
+      await OtpService.instance.registerPhone(user.id, phone);
+    } catch (_) {}
   }
 
   Future<String?> _showPasswordDialog(User user) async {
@@ -285,6 +455,26 @@ class _LoginScreenState extends State<LoginScreen> {
                           style: TextStyle(color: Colors.grey),
                         ),
                         const SizedBox(height: 16),
+                        if (defaultTargetPlatform == TargetPlatform.iOS) ...[
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: OutlinedButton.icon(
+                              onPressed: _loginWithPhone,
+                              icon: const Icon(Icons.phone_iphone),
+                              label: const Text('Mit Telefonnummer anmelden'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF3A6FFF),
+                                side: const BorderSide(color: Color(0xFF3A6FFF)),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          const Divider(),
+                          const SizedBox(height: 8),
+                        ],
                         if (_loadingUsers)
                           const Center(child: CircularProgressIndicator())
                         else if (_userFetchError != null)

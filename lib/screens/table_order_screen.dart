@@ -59,6 +59,8 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
   // Selected order line
   int? _selectedLineIdx;
 
+  bool _isProductsCollapsed = false;
+
   @override
   void initState() {
     super.initState();
@@ -242,7 +244,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
             ],
           ),
           content: Text(
-            'Möchtest du "${line.productName}" wirklich aus der Buchung entfernen?',
+            'Möchtest du "${line.productName}" aus der Buchung entfernen?',
           ),
           actions: [
             TextButton(
@@ -461,7 +463,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
             ],
           ),
           content: Text(
-            'Möchtest du die Buchung für Tisch ${widget.place.name} wirklich löschen?',
+            'Möchtest du die Buchung für Tisch ${widget.place.name} löschen?',
           ),
           actions: [
             TextButton(
@@ -805,24 +807,66 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
   Widget _buildPhoneLayout() {
     return Column(
       children: [
-        SizedBox(
-          height: 220,
-          child: _SectionCard(
-            title: 'Buchungen',
-            icon: Icons.receipt_long,
-            child: _buildOrdersList(),
+        if (_isProductsCollapsed)
+          Expanded(
+            child: _SectionCard(
+              title: 'Buchungen',
+              icon: Icons.receipt_long,
+              child: _buildOrdersList(),
+            ),
+          )
+        else
+          SizedBox(
+            height: 220,
+            child: _SectionCard(
+              title: 'Buchungen',
+              icon: Icons.receipt_long,
+              child: _buildOrdersList(),
+            ),
+          ),
+        GestureDetector(
+          onTap: () => setState(() => _isProductsCollapsed = !_isProductsCollapsed),
+          child: Container(
+            height: 32,
+            color: const Color(0xFFDDE6FF),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Row(
+              children: [
+                const Icon(Icons.fastfood_outlined, size: 15, color: Color(0xFF3A6FFF)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    _selectedCategory != null
+                        ? 'Produkte – ${_selectedCategory!.name}'
+                        : 'Produkte',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1A237E),
+                    ),
+                  ),
+                ),
+                Icon(
+                  _isProductsCollapsed ? Icons.expand_more : Icons.expand_less,
+                  size: 18,
+                  color: const Color(0xFF3A6FFF),
+                ),
+              ],
+            ),
           ),
         ),
-        SizedBox(height: 56, child: _buildMobileCategoryStrip()),
-        Expanded(
-          child: _SectionCard(
-            title: _selectedCategory != null
-                ? 'Produkte – ${_selectedCategory!.name}'
-                : 'Produkte',
-            icon: Icons.fastfood_outlined,
-            child: _buildProductsGrid(),
+        if (!_isProductsCollapsed) ...[
+          SizedBox(height: 56, child: _buildMobileCategoryStrip()),
+          Expanded(
+            child: _SectionCard(
+              title: _selectedCategory != null
+                  ? 'Produkte – ${_selectedCategory!.name}'
+                  : 'Produkte',
+              icon: Icons.fastfood_outlined,
+              child: _buildProductsGrid(),
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -880,6 +924,8 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
   // ── Orders list (top-left) ───────────────────────────────────────────────
 
   Widget _buildOrdersList() {
+    final showLineButtons = _isNumpadCollapsed ||
+        MediaQuery.of(context).size.width <= 700;
     if (_orderitemError != null) {
       return _ErrorRetry(message: _orderitemError!, onRetry: _fetchOrderItem);
     }
@@ -968,7 +1014,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
                       SizedBox(
                         width: 24,
                         height: 24,
-                        child: selected && _isNumpadCollapsed
+                        child: selected && showLineButtons
                             ? ElevatedButton(
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor:
@@ -1004,7 +1050,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
                       SizedBox(
                         width: 24,
                         height: 24,
-                        child: selected && _isNumpadCollapsed
+                        child: selected && showLineButtons
                             ? ElevatedButton(
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor:
@@ -1032,7 +1078,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      if (selected && _isNumpadCollapsed) ...[
+                      if (selected && showLineButtons) ...[
                         const SizedBox(width: 4),
                         SizedBox(
                           width: 24,
@@ -1377,46 +1423,30 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
         final isCompact = constraints.maxWidth <= 700;
 
         if (isCompact) {
-          final compactNumpadHeight = _isNumpadCollapsed
-              ? _numpadCollapsedHeight
-              : (constraints.maxHeight * 1).clamp(190.0, 484.0);
-
-          return Column(
-            children: [
-              SizedBox(
-                height: compactNumpadHeight,
-                child: _buildNumpad(isCollapsed: _isNumpadCollapsed),
-              ),
-              SizedBox(height: _isNumpadCollapsed ? 0 : 6),
-              Expanded(
-                child: _products!.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'Keine Produkte in dieser Kategorie.',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      )
-                    : GridView.builder(
-                        padding: const EdgeInsets.all(10),
-                        gridDelegate:
-                            const SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: 140,
-                          crossAxisSpacing: 8,
-                          mainAxisSpacing: 8,
-                          mainAxisExtent: 72,
-                        ),
-                        itemCount: _products!.length,
-                        itemBuilder: (context, i) {
-                          final p = _products![i];
-                          return _ProductCard(
-                            product: p,
-                            onTap: () => _openAttributesAndAddProduct(p),
-                          );
-                        },
-                      ),
-              ),
-            ],
-          );
+          return _products!.isEmpty
+              ? const Center(
+                  child: Text(
+                    'Keine Produkte in dieser Kategorie.',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                )
+              : GridView.builder(
+                  padding: const EdgeInsets.all(10),
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 140,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                    mainAxisExtent: 72,
+                  ),
+                  itemCount: _products!.length,
+                  itemBuilder: (context, i) {
+                    final p = _products![i];
+                    return _ProductCard(
+                      product: p,
+                      onTap: () => _openAttributesAndAddProduct(p),
+                    );
+                  },
+                );
         }
 
         final maxNumpad =
